@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Marketing Dashboard 예시</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; background: #f5f7fa; }
+    .filters { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
+    .filters select { padding: 5px; }
+    .chart-container { background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; }
+    table { width: 100%; border-collapse: collapse; background: #fff; }
+    th, td { padding: 8px; text-align: center; border-bottom: 1px solid #ddd; }
+    th { background: #eef1f7; }
+    .report-section { margin-top: 30px; background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+    .report-section button { padding: 8px 12px; border: none; background: #3b82f6; color: #fff; border-radius: 4px; cursor: pointer; }
+    .report-section textarea { width: 100%; height: 80px; margin: 10px 0; }
+  </style>
+</head>
+<body>
+  <h1>마케팅 데이터 대시보드 예시</h1>
+  
+  <div class="filters">
+    <select id="clientFilter">
+      <option value="All">전체 클라이언트</option>
+      <option value="Client A">Client A</option>
+      <option value="Client B">Client B</option>
+      <option value="Client C">Client C</option>
+    </select>
+    <select id="mediaFilter">
+      <option value="All">전체 매체</option>
+      <option value="Google">Google Ads</option>
+      <option value="Meta">Meta Ads</option>
+      <option value="Naver">Naver SA</option>
+    </select>
+    <select id="dateFilter">
+      <option value="7">지난 7일</option>
+      <option value="30">지난 30일</option>
+      <option value="90">지난 90일</option>
+    </select>
+    <select id="groupBy">
+      <option value="none">그룹화 없음</option>
+      <option value="client">클라이언트별</option>
+      <option value="media">매체별</option>
+    </select>
+    <select id="barMetric">
+      <option value="spend">광고비(₩)</option>
+      <option value="roas">ROAS(%)</option>
+      <option value="ctr">CTR(%)</option>
+      <option value="conv">전환수</option>
+    </select>
+    <select id="lineMetric">
+      <option value="roas">ROAS(%)</option>
+      <option value="spend">광고비(₩)</option>
+      <option value="ctr">CTR(%)</option>
+      <option value="conv">전환수</option>
+    </select>
+  </div>
+
+  <div class="chart-container">
+    <canvas id="combinedChart"></canvas>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>클라이언트</th>
+        <th>매체</th>
+        <th>날짜</th>
+        <th>광고비(₩)</th>
+        <th>ROAS(%)</th>
+        <th>CTR(%)</th>
+        <th>전환수</th>
+      </tr>
+    </thead>
+    <tbody id="dataTable"></tbody>
+  </table>
+
+  <div class="report-section">
+    <h2>외부용 보고서 생성</h2>
+    <button id="generateReport">보고서 링크 생성</button>
+    <textarea id="insights" placeholder="인사이트를 입력하세요..."></textarea>
+    <div id="reportLink"></div>
+  </div>
+
+  <script>
+    const sampleData = [
+      { client: 'Client A', media: 'Google', spend: 500000, roas: 120, ctr: 2.5, conv: 300, date: '2025-07-28' },
+      { client: 'Client A', media: 'Meta', spend: 350000, roas: 150, ctr: 3.1, conv: 280, date: '2025-07-28' },
+      { client: 'Client B', media: 'Naver', spend: 450000, roas: 110, ctr: 1.9, conv: 250, date: '2025-07-28' },
+      { client: 'Client C', media: 'Google', spend: 300000, roas: 130, ctr: 2.2, conv: 200, date: '2025-07-28' },
+      // ... 더미 데이터 추가 가능 (date format: YYYY-MM-DD)
+    ];
+
+    const controls = ['clientFilter','mediaFilter','dateFilter','groupBy','barMetric','lineMetric'];
+    controls.forEach(id => document.getElementById(id).addEventListener('change', renderDashboard));
+
+    document.getElementById('generateReport').addEventListener('click', () => {
+      const link = document.createElement('a');
+      link.href = '#';
+      link.textContent = 'https://your-domain.com/report/2025-08-06';
+      link.target = '_blank';
+      document.getElementById('reportLink').innerHTML = '';
+      document.getElementById('reportLink').appendChild(link);
+    });
+
+    let combinedChart;
+    function renderDashboard() {
+      const client = document.getElementById('clientFilter').value;
+      const media = document.getElementById('mediaFilter').value;
+      const days = parseInt(document.getElementById('dateFilter').value);
+      const groupBy = document.getElementById('groupBy').value;
+      const barMetric = document.getElementById('barMetric').value;
+      const lineMetric = document.getElementById('lineMetric').value;
+      
+      // 날짜 필터 (최근 N일)
+      const endDate = new Date();
+      const startDate = new Date(endDate.getTime() - (days-1)*24*60*60*1000);
+      
+      // 필터 적용 데이터
+      let filtered = sampleData.filter(d => {
+        const dDate = new Date(d.date);
+        return dDate >= startDate && dDate <= endDate &&
+               (client === 'All' || d.client === client) &&
+               (media === 'All' || d.media === media);
+      });
+
+      // 테이블 렌더링
+      const tbody = document.getElementById('dataTable'); tbody.innerHTML = '';
+      filtered.forEach(d => {
+        const tr = document.createElement('tr');
+        ['client','media','date','spend','roas','ctr','conv'].forEach(key => {
+          const td = document.createElement('td');
+          td.textContent = key === 'spend' ? d[key].toLocaleString() : d[key];
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      });
+
+      // x축: 날짜 목록
+      const dateSet = [...new Set(filtered.map(d=>d.date))].sort();
+      const labels = dateSet;
+
+      // 그룹별 데이터 집계
+      const groups = groupBy === 'none' ? ['All']
+                    : [...new Set(filtered.map(d=>d[groupBy]))];
+
+      const datasets = [];
+      groups.forEach((grp, idx) => {
+        const groupData = filtered.filter(d => grp==='All' || d[groupBy]===grp);
+        // Bar data
+        const barData = labels.map(date =>
+          groupData.filter(d=>d.date===date).reduce((sum,d)=>sum+d[barMetric],0)
+        );
+        datasets.push({
+          label: grp + ' - ' + document.getElementById('barMetric').selectedOptions[0].text,
+          data: barData,
+          type: 'bar',
+          backgroundColor: `rgba(${59+idx*50}, ${130-idx*30}, 246, 0.5)`
+        });
+
+        // Line data
+        const lineData = labels.map(date => {
+          const arr = groupData.filter(d=>d.date===date).map(d=>d[lineMetric]);
+          return arr.length ? (arr.reduce((a,b)=>a+b,0)/arr.length).toFixed(1) : 0;
+        });
+        datasets.push({
+          label: grp + ' - ' + document.getElementById('lineMetric').selectedOptions[0].text,
+          data: lineData,
+          type: 'line',
+          fill: false,
+          borderColor: `rgba(${234-idx*20}, ${88+idx*20}, 12, 0.8)`,
+          tension: 0.2
+        });
+      });
+
+      if (combinedChart) combinedChart.destroy();
+      combinedChart = new Chart(document.getElementById('combinedChart'), {
+        data: { labels, datasets },
+        options: { responsive: true }
+      });
+    }
+
+    renderDashboard();
+  </script>
+</body>
+</html>
