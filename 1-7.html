@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>클라이언트 보고서 페이지</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css" />
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+  <style>
+    body { font-family: 'Segoe UI', sans-serif; margin: 20px; background: #f4f6f8; }
+    h1 { margin-bottom: 5px; }
+    .period { font-size: 0.9rem; color: #555; margin-bottom: 15px; }
+    .term-toggle { margin-bottom: 15px; }
+    .term-toggle button { padding: 6px 12px; margin-right: 8px; border: 1px solid #ccc; border-radius: 4px; background: #fff; cursor: pointer; }
+    .term-toggle button.active { background: #3b82f6; color: #fff; border-color: #3b82f6; }
+    .section { background: #fff; padding: 20px; margin-bottom: 30px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .section h2 { margin-top: 0; }
+    .charts { display: flex; gap: 20px; margin-bottom: 20px; }
+    .chart-container { flex: 1; }
+    table.dataTable { width: 100% !important; margin-bottom: 20px; }
+    textarea.insight { width: 100%; height: 80px; padding: 10px; border: 1px solid #ccc; border-radius: 4px; }
+    .dt-center { text-align: center; }
+    .dt-right  { text-align: right; }
+  </style>
+</head>
+<body>
+  <h1>Client A 보고서</h1>
+  <div class="period">기간: 2025-07-31 ~ 2025-08-05</div>
+
+  <script>
+    function getLastNDates(n) {
+      const arr = [];
+      const end = new Date('2025-08-05');
+      for (let i = n - 1; i >= 0; i--) {
+        const d = new Date(end);
+        d.setDate(end.getDate() - i);
+        arr.push(d.toISOString().slice(0,10));
+      }
+      return arr;
+    }
+    const dailyDates = getLastNDates(7);
+    const weeklyLabels = Array.from({length:8}, (_,i) => `W${i+1}`);
+  </script>
+
+  <script>
+    const sections = ['overall','Google','Meta','Naver','NaverGFA'];
+    const mediaMap = {
+      overall: ['Google','Meta','Naver','Naver GFA'],
+      Google: ['Google'], Meta: ['Meta'], Naver: ['Naver'], NaverGFA: ['Naver GFA']
+    };
+    const sampleData = {};
+    sections.forEach(sec => {
+      sampleData[sec] = {
+        short: dailyDates.map(date => {
+          const spend = Math.floor(Math.random()*400000)+100000;
+          const impr  = Math.floor(spend*2 + Math.random()*5000);
+          const clicks= Math.floor(impr*(Math.random()*0.02+0.01));
+          const conv  = Math.floor(clicks*(Math.random()*0.2+0.05));
+          const revenue = Math.floor(conv*(Math.random()*50000+20000));
+          return { period: date, spend, impr, clicks, conv, revenue,
+            roas: +(revenue/spend*100).toFixed(1),
+            cpm: +(spend/impr*1000).toFixed(1),
+            cpc: clicks?+(spend/clicks).toFixed(1):0,
+            ctr: +(clicks/impr*100).toFixed(2),
+            cpa: conv?+(spend/conv).toFixed(1):0,
+            cvr: clicks?+((conv/clicks)*100).toFixed(2):0
+          };
+        }),
+        long: weeklyLabels.map(w => {
+          const spend = Math.floor(Math.random()*2000000)+500000;
+          const impr  = Math.floor(spend*2 + Math.random()*20000);
+          const clicks= Math.floor(impr*(Math.random()*0.02+0.01));
+          const conv  = Math.floor(clicks*(Math.random()*0.2+0.05));
+          const revenue = Math.floor(conv*(Math.random()*50000+20000));
+          return { period: w, spend, impr, clicks, conv, revenue,
+            roas: +(revenue/spend*100).toFixed(1),
+            cpm: +(spend/impr*1000).toFixed(1),
+            cpc: clicks?+(spend/clicks).toFixed(1):0,
+            ctr: +(clicks/impr*100).toFixed(2),
+            cpa: conv?+(spend/conv).toFixed(1):0,
+            cvr: clicks?+((conv/clicks)*100).toFixed(2):0
+          };
+        })
+      };
+    });
+    const termMode = Object.fromEntries(sections.map(s=>[s,'short']));
+  </script>
+
+  <script>
+    sections.forEach(sec => {
+      const title = sec==='overall'? '전체' : sec.replace('GFA',' GFA');
+      document.write(`
+        <div class="section" id="section-${sec}">
+          <h2>${title}</h2>
+          <div class="term-toggle" id="${sec}Toggle">
+            <button id="${sec}ShortBtn">단기(7일)</button>
+            <button id="${sec}LongBtn">장기(8주)</button>
+          </div>
+          <div class="charts">
+            <div class="chart-container"><canvas id="${sec}TrendChart"></canvas></div>
+            <div class="chart-container"><canvas id="${sec}ChannelChart"></canvas></div>
+          </div>
+          <table id="${sec}DataTable" class="display"></table>
+          <div><strong>인사이트 (${title}):</strong>
+            <textarea id="${sec}Insight" class="insight" placeholder="${title} 인사이트 작성...">${
+                sec==='overall' 
+                  ? '이번 기간 동안 전체 매체에서 광고 효율이 대체로 안정적이었으며, 특히 Meta 채널의 ROAS가 120% 이상을 기록했습니다. 그러나 Naver GFA의 클릭당 비용이 상승 추세이므로 예산 조정이 필요합니다.' 
+                  : sec==='Google' 
+                    ? 'Google 채널은 클릭수가 크게 증가하여 총 매출이 30% 상승했습니다. CPC는 낮은 편이었으나, Conversion Rate 개선을 위해 랜딩 페이지 최적화가 필요합니다.' 
+                    : sec==='Meta' 
+                      ? 'Meta 채널은 ROAS가 평균 이하로 나타났습니다. 특히 최근 주에 Spend 대비 매출이 감소하였으므로, 타겟 세그먼트 재검토가 필요합니다.' 
+                      : sec==='Naver' 
+                        ? 'Naver 채널은 높은 인상수에도 불구하고 CTR이 낮아 클릭 유도가 미진합니다. 키워드 및 소재 변경을 검토해주세요.' 
+                        : 'Naver GFA는 안정적인 CTR과 매출을 기록했으나, 예산 대비 ROAS 개선 여지가 있습니다. 캠페인 구조를 세분화하여 테스트를 권장합니다.'
+              }</textarea>
+          </div>
+        </div>
+      `);
+    });
+  </script>
+
+  <script>
+    function renderSection(sec) {
+      const arr = sampleData[sec][termMode[sec]];
+      const labels = arr.map(d=>d.period);
+      const spendData = arr.map(d=>d.spend);
+      const roasData  = arr.map(d=>d.roas);
+      new Chart(document.getElementById(`${sec}TrendChart`),{
+        data:{labels,datasets:[
+          {type:'bar',label:'광고비용',data:spendData,yAxisID:'y',backgroundColor:'rgba(59,123,246,0.5)'},
+          {type:'line',label:'ROAS(%)',data:roasData,yAxisID:'y1',borderColor:'rgba(246,88,59,0.8)',fill:false}
+        ]},options:{responsive:true,scales:{y:{title:{display:true,text:'광고비용'}},y1:{position:'right',grid:{drawOnChartArea:false},title:{display:true,text:'ROAS(%)'}}}}
+      });
+      const medias = mediaMap[sec];
+      const spendByMedia = medias.map(m=>arr.reduce((s,d)=>s+d.spend,0));
+      const revByMedia   = medias.map(m=>arr.reduce((s,d)=>s+d.revenue,0));
+      new Chart(document.getElementById(`${sec}ChannelChart`),{
+        data:{labels:medias,datasets:[
+          {label:'광고비용',type:'bar',data:spendByMedia,yAxisID:'y',backgroundColor:'rgba(59,146,64,0.6)'},
+          {label:'매출액',  type:'bar',data:revByMedia,  yAxisID:'y1',backgroundColor:'rgba(64,150,199,0.6)'}
+        ]},options:{responsive:true,scales:{y:{title:{display:true,text:'광고비용'}},y1:{position:'right',grid:{drawOnChartArea:false},title:{display:true,text:'매출액'}}}}
+      });
+      const total = arr.reduce((acc,d)=>{['spend','impr','clicks','conv','revenue','roas','cpm','cpc','ctr','cpa','cvr'].forEach(k=>acc[k]=(acc[k]||0)+d[k]);return acc;},{});
+      total.period = '총계';
+      const rows = [total, ...arr];
+      const dt = $(`#${sec}DataTable`).DataTable({ destroy:true, data: rows.map(r=>[
+        r.period,
+        r.spend.toLocaleString(), r.impr.toLocaleString(), r.clicks.toLocaleString(), r.conv.toLocaleString(), r.revenue.toLocaleString(),
+        r.roas.toLocaleString(), r.cpm.toLocaleString(), r.cpc.toLocaleString(), r.ctr.toLocaleString(), r.cpa.toLocaleString(), r.cvr.toLocaleString()
+      ]), columns:[
+        { title:'기간' },{ title:'광고비용' },{ title:'노출수' },{ title:'클릭수' },{ title:'구매수' },{ title:'매출액' },
+        { title:'ROAS(%)' },{ title:'CPM' },{ title:'CPC' },{ title:'CTR(%)' },{ title:'CPA' },{ title:'CVR(%)' }
+      ], ordering:false, paging:false, info:false, searching:false });
+      dt.columns().every(i=>{ $(dt.column(i).header()).css('text-align', i===0?'center':'right'); dt.column(i).nodes().to$().css('text-align', i===0?'center':'right'); });
+    }
+    $(document).ready(()=>{
+      sections.forEach(sec=>{
+        $(`#${sec}ShortBtn,#${sec}LongBtn`).click(function(){
+          termMode[sec] = this.id.endsWith('ShortBtn')?'short':'long';
+          $(`#${sec}Toggle button`).removeClass('active');$(this).addClass('active'); renderSection(sec);
+        });
+        $(`#${sec}ShortBtn`).addClass('active'); renderSection(sec);
+      });
+    });
+  </script>
+</body>
+</html>
