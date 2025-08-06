@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>클라이언트 보고서 페이지</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css">
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+  <style>
+    body { font-family:'Segoe UI',sans-serif; margin:20px; background:#f4f6f8; }
+    h1 { margin-bottom:10px; }
+    .section { background:#fff; padding:20px; margin-bottom:30px; border-radius:6px; box-shadow:0 1px 3px rgba(0,0,0,0.1); }
+    .section h2 { margin-top:0; }
+    .period { font-size:0.9rem; color:#555; margin-bottom:15px; }
+    .charts { display:flex; gap:20px; margin-bottom:20px; }
+    .chart-container { flex:1; }
+    table.dataTable { width:100% !important; margin-bottom:20px; }
+    #periodTable th, #periodTable td { padding:8px; border:1px solid #ddd; }
+    #periodTable { width:100%; border-collapse:collapse; margin-bottom:20px; }
+    #periodTable th { background:#eef1f7; }
+    textarea.insight { width:100%; height:80px; padding:10px; border:1px solid #ccc; border-radius:4px; }
+  </style>
+</head>
+<body>
+  <h1>Client A 보고서</h1>
+  <div class="period">기간: 2025-07-31 ~ 2025-08-05</div>
+
+  <!-- 전체 섹션 -->
+  <div class="section" id="section-overall">
+    <h2>전체</h2>
+    <div class="charts">
+      <div class="chart-container"><canvas id="overallTrendChart"></canvas></div>
+      <div class="chart-container"><canvas id="overallChannelChart"></canvas></div>
+    </div>
+    <table id="overallMediaTable" class="display"></table>
+    <table id="overallPeriodTable">
+      <thead><tr id="overallPeriodHeader"></tr></thead>
+      <tbody></tbody>
+    </table>
+    <div><strong>인사이트:</strong>
+      <textarea id="overallInsight" class="insight" placeholder="이곳에 전체 데이터 인사이트를 작성하세요..."></textarea>
+    </div>
+  </div>
+
+  <!-- 각 매체 섹션 반복 -->
+  <div class="section" id="section-Google">
+    <h2>Google</h2>
+    <div class="charts">
+      <div class="chart-container"><canvas id="GoogleTrendChart"></canvas></div>
+      <div class="chart-container"><canvas id="GoogleChannelChart"></canvas></div>
+    </div>
+    <table id="GoogleMediaTable" class="display"></table>
+    <table id="GooglePeriodTable">
+      <thead><tr id="GooglePeriodHeader"></tr></thead>
+      <tbody></tbody>
+    </table>
+    <div><strong>인사이트 (Google):</strong>
+      <textarea id="GoogleInsight" class="insight" placeholder="Google 매체 인사이트를 작성하세요..."></textarea>
+    </div>
+  </div>
+
+  <div class="section" id="section-Meta">
+    <h2>Meta</h2>
+    <div class="charts">
+      <div class="chart-container"><canvas id="MetaTrendChart"></canvas></div>
+      <div class="chart-container"><canvas id="MetaChannelChart"></canvas></div>
+    </div>
+    <table id="MetaMediaTable" class="display"></table>
+    <table id="MetaPeriodTable">
+      <thead><tr id="MetaPeriodHeader"></tr></thead>
+      <tbody></tbody>
+    </table>
+    <div><strong>인사이트 (Meta):</strong>
+      <textarea id="MetaInsight" class="insight" placeholder="Meta 매체 인사이트를 작성하세요..."></textarea>
+    </div>
+  </div>
+
+  <div class="section" id="section-Naver">
+    <h2>Naver</h2>
+    <div class="charts">
+      <div class="chart-container"><canvas id="NaverTrendChart"></canvas></div>
+      <div class="chart-container"><canvas id="NaverChannelChart"></canvas></div>
+    </div>
+    <table id="NaverMediaTable" class="display"></table>
+    <table id="NaverPeriodTable">
+      <thead><tr id="NaverPeriodHeader"></tr></thead>
+      <tbody></tbody>
+    </table>
+    <div><strong>인사이트 (Naver):</strong>
+      <textarea id="NaverInsight" class="insight" placeholder="Naver 매체 인사이트를 작성하세요..."></textarea>
+    </div>
+  </div>
+
+  <div class="section" id="section-NaverGFA">
+    <h2>Naver GFA</h2>
+    <div class="charts">
+      <div class="chart-container"><canvas id="NaverGFATrendChart"></canvas></div>
+      <div class="chart-container"><canvas id="NaverGFAChannelChart"></canvas></div>
+    </div>
+    <table id="NaverGFAMediaTable" class="display"></table>
+    <table id="NaverGFAPeriodTable">
+      <thead><tr id="NaverGFAPeriodHeader"></tr></thead>
+      <tbody></tbody>
+    </table>
+    <div><strong>인사이트 (Naver GFA):</strong>
+      <textarea id="NaverGFAInsight" class="insight" placeholder="Naver GFA 매체 인사이트를 작성하세요..."></textarea>
+    </div>
+  </div>
+
+  <script>
+    // 샘플 데이터 생성 (Client A)
+    const data = [];
+    const client = 'Client A';
+    const medias = ['Google','Meta','Naver','Naver GFA'];
+    const dates = ['2025-07-31','2025-08-01','2025-08-02','2025-08-03','2025-08-04','2025-08-05'];
+    dates.forEach(date => {
+      medias.forEach(media => {
+        const spend = Math.floor(Math.random()*400000)+100000;
+        const impr  = Math.floor(spend*2 + Math.random()*10000);
+        const clicks= Math.floor(impr*(Math.random()*0.02+0.01));
+        const conv  = Math.floor(clicks*(Math.random()*0.2+0.05));
+        const revenue = Math.floor(conv*(Math.random()*50000+20000));
+        data.push({ date, client, media, spend, impr, clicks, conv, revenue,
+          roas: +(revenue/spend*100).toFixed(1),
+          cpm: +(spend/impr*1000).toFixed(1),
+          cpc: clicks?+(spend/clicks).toFixed(1):0,
+          ctr: +(clicks/impr*100).toFixed(2),
+          cpa: conv?+(spend/conv).toFixed(1):0,
+          cvr: clicks?+((conv/clicks)*100).toFixed(2):0,
+          aov: conv?+(revenue/conv).toFixed(1):0
+        });
+      });
+    });
+
+    const sections = [
+      { prefix:'overall', media:null },
+      { prefix:'Google', media:'Google' },
+      { prefix:'Meta', media:'Meta' },
+      { prefix:'Naver', media:'Naver' },
+      { prefix:'NaverGFA', media:'Naver GFA' }
+    ];
+
+    sections.forEach(sec => {
+      const prefix = sec.prefix;
+      const filtered = data.filter(d => d.client===client && (sec.media? d.media===sec.media: true));
+      updateTrend(prefix, filtered);
+      updateChannel(prefix, filtered);
+      updateMediaTable(prefix, filtered);
+      updatePeriodTable(prefix, filtered);
+      // DataTables init
+      $(`#${prefix}MediaTable`).DataTable({ ordering:false, info:false, paging:false, searching:false, columnDefs:[{ className:'dt-right', targets:'_all' }] });
+    });
+
+    function updateTrend(p, arr) {
+      const labels = [...new Set(arr.map(d=>d.date))].sort();
+      const spend = labels.map(l=>arr.filter(d=>d.date===l).reduce((s,d)=>s+d.spend,0));
+      const roas  = labels.map(l=>arr.filter(d=>d.date===l).reduce((s,d)=>s+d.roas,0)/labels.length);
+      new Chart(document.getElementById(`${p}TrendChart`),{
+        data:{labels,datasets:[
+          { type:'bar',  label:'Spend', data:spend, yAxisID:'y', backgroundColor:'rgba(59,123,246,0.5)' },
+          { type:'line', label:'ROAS(%)', data:roas,  yAxisID:'y1', borderColor:'rgba(246,88,59,0.8)', fill:false }
+        ]},options:{responsive:true, scales:{ y:{type:'linear', position:'left', title:{display:true,text:'Spend'}}, y1:{type:'linear', position:'right', grid:{drawOnChartArea:false}, title:{display:true,text:'ROAS(%)'}} }}
+      });
+    }
+
+    function updateChannel(p, arr) {
+      const groups = [...new Set(arr.map(d=>d.media))];
+      const spend = groups.map(m=>arr.filter(d=>d.media===m).reduce((s,d)=>s+d.spend,0));
+      const rev   = groups.map(m=>arr.filter(d=>d.media===m).reduce((s,d)=>s+d.revenue,0));
+      new Chart(document.getElementById(`${p}ChannelChart`),{
+        data:{labels:groups,datasets:[
+          { label:'Spend',   type:'bar', data:spend, yAxisID:'y', backgroundColor:'rgba(59,146,64,0.6)' },
+          { label:'Revenue', type:'bar', data:rev,   yAxisID:'y1', backgroundColor:'rgba(64,150,199,0.6)' }
+        ]},options:{responsive:true, scales:{ y:{title:{display:true,text:'Spend'}}, y1:{position:'right', grid:{drawOnChartArea:false}, title:{display:true,text:'Revenue'}} }}
+      });
+    }
+
+    function updateMediaTable(p, arr) {
+      const rows = [];
+      const meds = [...new Set(arr.map(d=>d.media))];
+      meds.forEach(m=>{
+        const grp = arr.filter(d=>d.media===m);
+        const sum = k => grp.reduce((s,d)=>s+d[k],0);
+        const metrics = ['spend','impr','clicks','conv','revenue','roas','cpm','cpc','ctr','cpa','cvr','aov'].map(k=>sum(k).toLocaleString());
+        rows.push([client, m, ...metrics]);
+      });
+      const table = $(`#${p}MediaTable`).DataTable();
+      table.clear().rows.add(rows).draw();
+    }
+
+    function updatePeriodTable(p, arr) {
+      const tbody = document.querySelector(`#${p}PeriodTable tbody`);
+      const thead = document.getElementById(`${p}PeriodHeader`);
+      // header
+      const cols = ['Period','Spend','Impr.','Clicks','Conv.','Revenue','ROAS','CPM','CPC','CTR','CPA','CVR','AOV'];
+      thead.innerHTML = '';
+      cols.forEach((c,i)=>{ const th=document.createElement('th'); th.textContent=c; th.style.textAlign = i===0?'center':'right'; thead.appendChild(th); });
+      // data
+      const map = new Map();
+      arr.forEach(d=>{
+        const key = d.date;
+        if(!map.has(key)) map.set(key,[]);
+        map.get(key).push(d);
+      });
+      tbody.innerHTML = '';
+      Array.from(map.entries()).sort().forEach(([period, items])=>{
+        const sum = k => items.reduce((s,d)=>s+d[k],0);
+        const vals = [period, ...['spend','impr','clicks','conv','revenue','roas','cpm','cpc','ctr','cpa','cvr','aov'].map(k=>sum(k).toLocaleString())];
+        const tr = document.createElement('tr');
+        vals.forEach((v,i)=>{ const td=document.createElement('td'); td.textContent=v; td.style.textAlign = i===0?'center':'right'; tr.appendChild(td); });
+        tbody.appendChild(tr);
+      });
+    }
+  </script>
+</body>
+</html>
