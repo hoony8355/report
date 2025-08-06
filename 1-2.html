@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>클라이언트 보고서 페이지</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css">
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+  <style>
+    body { font-family:'Segoe UI',sans-serif; margin:20px; background:#f4f6f8; }
+    h1 { margin-bottom:10px; }
+    .period { font-size:0.9rem; color:#555; margin-bottom:15px; }
+    .term-toggle { margin-bottom:15px; }
+    .term-toggle button { padding:6px 12px; margin-right:10px; border:1px solid #ccc; border-radius:4px; cursor:pointer; background:#fff; }
+    .term-toggle button.active { background:#3b82f6; color:#fff; border-color:#3b82f6; }
+    .section { background:#fff; padding:20px; margin-bottom:30px; border-radius:6px; box-shadow:0 1px 3px rgba(0,0,0,0.1); }
+    .section h2 { margin-top:0; }
+    .charts { display:flex; gap:20px; margin-bottom:20px; }
+    .chart-container { flex:1; }
+    table.dataTable { width:100% !important; margin-bottom:20px; }
+    #periodTable { width:100%; border-collapse:collapse; margin-bottom:20px; }
+    #periodTable th, #periodTable td { padding:8px; border:1px solid #ddd; }
+    #periodTable th { background:#eef1f7; }
+    textarea.insight { width:100%; height:80px; padding:10px; border:1px solid #ccc; border-radius:4px; }
+    .dt-center { text-align:center; }
+    .dt-right { text-align:right; }
+  </style>
+</head>
+<body>
+  <h1>Client A 보고서</h1>
+  <div class="period">기간: 2025-07-31 ~ 2025-08-05</div>
+
+  <!-- 전체 섹션 -->
+  <div class="section" id="section-overall">
+    <h2>전체</h2>
+    <div class="term-toggle" id="overallToggle">
+      <button id="overallShortBtn">단기(1주일)</button>
+      <button id="overallLongBtn">장기(8주)</button>
+    </div>
+    <div class="charts">
+      <div class="chart-container"><canvas id="overallTrendChart"></canvas></div>
+      <div class="chart-container"><canvas id="overallChannelChart"></canvas></div>
+    </div>
+    <table id="overallMediaTable" class="display"></table>
+    <table id="overallPeriodTable">
+      <thead><tr id="overallPeriodHeader"></tr></thead>
+      <tbody></tbody>
+    </table>
+    <div><strong>인사이트:</strong>
+      <textarea id="overallInsight" class="insight" placeholder="전체 매체 인사이트를 여기에 작성하세요..."></textarea>
+    </div>
+  </div>
+
+  <!-- 매체별 섹션 반복 예시 -->
+  <div class="section" id="section-Google">
+    <h2>Google</h2>
+    <div class="term-toggle" id="GoogleToggle">
+      <button id="GoogleShortBtn">단기(1주일)</button>
+      <button id="GoogleLongBtn">장기(8주)</button>
+    </div>
+    <div class="charts">
+      <div class="chart-container"><canvas id="GoogleTrendChart"></canvas></div>
+      <div class="chart-container"><canvas id="GoogleChannelChart"></canvas></div>
+    </div>
+    <table id="GoogleMediaTable" class="display"></table>
+    <table id="GooglePeriodTable">
+      <thead><tr id="GooglePeriodHeader"></tr></thead>
+      <tbody></tbody>
+    </table>
+    <div><strong>인사이트 (Google):</strong>
+      <textarea id="GoogleInsight" class="insight" placeholder="Google 매체 인사이트를 작성하세요..."></textarea>
+    </div>
+  </div>
+
+  <!-- Meta, Naver, Naver GFA 섹션 생략 -->
+
+  <script>
+    // 샘플 데이터 생성
+    const data = [];
+    const client = 'Client A';
+    const medias = ['Google','Meta','Naver','Naver GFA'];
+    const dates = ['2025-07-01','2025-07-08','2025-07-15','2025-07-22','2025-07-29','2025-08-05','2025-08-12','2025-08-19'];
+    // 주간 데이터 (8주) + 일간 예시
+    dates.forEach(date => medias.forEach(media => {
+      const spend = Math.floor(Math.random()*400000)+100000;
+      const revenue = Math.floor(spend*(1+Math.random()));
+      data.push({ date, client, media, spend, revenue,
+        roas: +(revenue/spend*100).toFixed(1)
+      });
+    }));
+
+    const termMode = { overall:'short', Google:'short' }; // 초기값
+    const sections = [ { prefix:'overall', media:null }, { prefix:'Google', media:'Google' } ];
+
+    sections.forEach(sec=>{
+      const p = sec.prefix;
+      // 버튼 활성화
+      $(`#${p}ShortBtn, #${p}LongBtn`).click(function(){
+        termMode[p] = this.id.endsWith('ShortBtn')?'short':'long';
+        $(`#${p}Toggle button`).removeClass('active');
+        $(this).addClass('active');
+        renderSection(p);
+      });
+      // 초기 active
+      $(`#${p}ShortBtn`).addClass('active');
+    });
+
+    function renderSection(prefix){
+      const sec = sections.find(s=>s.prefix===prefix);
+      let arr = data.filter(d=>d.client===client && (sec.media?d.media===sec.media:true));
+      // 단기(1주) vs 장기(8주)
+      if(termMode[prefix]==='short'){
+        // 필터 최근 7일 데이터
+        const allDates = [...new Set(arr.map(d=>d.date))].sort();
+        const latest = allDates[allDates.length-1];
+        const last7 = allDates.slice(-1)[0]; // for example use earliest of arr
+        arr = arr; // in demo arr already grouped by week
+      } else {
+        // 장기: arr as is (8주 기준)
+      }
+      updateTrend(prefix, arr);
+      updateChannel(prefix, arr);
+      updateMediaTable(prefix, arr);
+      updatePeriodTable(prefix, arr);
+    }
+
+    function updateTrend(p,arr){
+      const labels = [...new Set(arr.map(d=>d.date))].sort();
+      const spend = labels.map(l=>arr.filter(d=>d.date===l).reduce((s,d)=>s+d.spend,0));
+      const roas  = labels.map(l=>arr.filter(d=>d.date===l).reduce((s,d)=>s+d.roas,0)/arr.filter(d=>d.date===l).length);
+      new Chart(document.getElementById(`${p}TrendChart`),{
+        data:{labels,datasets:[
+          {type:'bar',label:'Spend',data:spend,yAxisID:'y',backgroundColor:'rgba(59,123,246,0.5)'},
+          {type:'line',label:'ROAS',data:roas,yAxisID:'y1',borderColor:'rgba(246,88,59,0.8)',fill:false}
+        ]},options:{responsive:true,scales:{y:{title:{display:true,text:'Spend'}},y1:{position:'right',grid:{drawOnChartArea:false},title:{display:true,text:'ROAS(%)'}}}}
+      });
+    }
+
+    function updateChannel(p,arr){
+      const groups = [...new Set(arr.map(d=>d.media))];
+      const spend = groups.map(m=>arr.filter(d=>d.media===m).reduce((s,d)=>s+d.spend,0));
+      const revenue = groups.map(m=>arr.filter(d=>d.media===m).reduce((s,d)=>s+d.revenue,0));
+      new Chart(document.getElementById(`${p}ChannelChart`),{
+        data:{labels:groups,datasets:[
+          {label:'Spend',type:'bar',data:spend,yAxisID:'y',backgroundColor:'rgba(59,146,64,0.6)'},
+          {label:'Revenue',type:'bar',data:revenue,yAxisID:'y1',backgroundColor:'rgba(64,150,199,0.6)'}
+        ]},options:{responsive:true,scales:{y:{title:{display:true,text:'Spend'}},y1:{position:'right',grid:{drawOnChartArea:false},title:{display:true,text:'Revenue'}}}}
+      });
+    }
+
+    function updateMediaTable(p,arr){
+      const rows = [];
+      const meds = [...new Set(arr.map(d=>d.media))];
+      meds.forEach(m=>{const grp=arr.filter(d=>d.media===m);rows.push([client,m,grp.map(d=>d.spend).reduce((a,b)=>a+b,0).toLocaleString()]);});
+      const dt=$(`#${p}MediaTable`).DataTable(); dt.clear(); dt.rows.add(rows); dt.draw();
+    }
+
+    function updatePeriodTable(p,arr){
+      const tbody=document.querySelector(`#${p}PeriodTable tbody`), thead=document.getElementById(`${p}PeriodHeader`);
+      const cols=['Period','Spend','Revenue','ROAS']; thead.innerHTML='';cols.forEach((c,i)=>{const th=document.createElement('th');th.textContent=c;th.style.textAlign=i?'right':'center';thead.appendChild(th);});
+      tbody.innerHTML='';arr.forEach(d=>{const tr=document.createElement('tr');['date','spend','revenue','roas'].forEach((k,i)=>{const td=document.createElement('td');td.textContent=d[k].toLocaleString();td.style.textAlign=i?'right':'center';tr.appendChild(td);});tbody.appendChild(tr);});
+    }
+
+    $(document).ready(function(){ sections.forEach(sec=>renderSection(sec.prefix)); });
+  </script>
+</body>
+</html>
