@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>마케팅 상세 대시보드</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css">
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+  <style>
+    body { font-family: 'Segoe UI', sans-serif; margin: 20px; background: #f4f6f8; }
+    header { margin-bottom: 20px; }
+    .filters { display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 20px; }
+    .filters select, .filters input[type=date], .filters button { padding: 6px 8px; border: 1px solid #ccc; border-radius: 4px; }
+    .charts { display: flex; gap: 20px; margin-bottom: 20px; }
+    .chart-container { flex: 1; background: #fff; padding: 20px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .chart-container h4 { margin-bottom: 10px; font-size: 1.1rem; color: #333; }
+    table.dataTable { width: 100% !important; background: #fff; border-radius: 6px; margin-bottom: 30px; }
+    thead th { background: #eef1f7; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>전체 클라이언트 페이지</h1>
+    <div class="filters">
+      <label>기간: <input type="date" id="startDate"> - <input type="date" id="endDate"></label>
+      <select id="clientFilter"><option>전체 클라이언트</option><option>Client A</option><option>Client B</option><option>Client C</option></select>
+      <select id="mediaFilter"><option>전체 매체</option><option>Google</option><option>Meta</option><option>Naver</option><option>Naver GFA</option></select>
+      <button id="applyFilters">적용</button>
+    </div>
+  </header>
+
+  <div class="charts">
+    <div class="chart-container">
+      <h4>기간별 Spend vs ROAS</h4>
+      <canvas id="trendChart"></canvas>
+    </div>
+    <div class="chart-container">
+      <h4>매체별 Spend vs Revenue</h4>
+      <canvas id="channelChart"></canvas>
+    </div>
+  </div>
+
+  <section>
+    <h2>클라이언트 & 매체별 집계 테이블</h2>
+    <table id="clientMediaTable">
+      <thead>
+        <tr>
+          <th rowspan="2">Client</th>
+          <th rowspan="2">Media</th>
+          <th colspan="12">Metrics</th>
+        </tr>
+        <tr>
+          <th>Spend</th><th>Impr.</th><th>Clicks</th><th>Conv.</th><th>Revenue</th>
+          <th>ROAS(%)</th><th>CPM</th><th>CPC</th><th>CTR(%)</th><th>CPA</th>
+          <th>CVR(%)</th><th>AOV</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>기간별 상세 테이블</h2>
+    <div class="filters" style="margin-bottom:10px;">
+      <label>단위:
+        <select id="periodUnit">
+          <option value="day">일간</option>
+          <option value="week">주간</option>
+        </select>
+      </label>
+    </div>
+    <table id="periodTable">
+      <thead>
+        <tr id="periodHeader"></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <script>
+    // 샘플 데이터
+    const data = [];
+    const clients = ['Client A','Client B','Client C'];
+    const medias = ['Google','Meta','Naver','Naver GFA'];
+    const dates = ['2025-07-31','2025-08-01','2025-08-02','2025-08-03','2025-08-04','2025-08-05'];
+    dates.forEach(date => {
+      clients.forEach(client => {
+        medias.forEach(media => {
+          const spend = Math.floor(Math.random()*400000)+100000;
+          const impr = Math.floor(spend*2 + Math.random()*10000);
+          const clicks = Math.floor(impr*(Math.random()*0.02+0.01));
+          const conv = Math.floor(clicks*(Math.random()*0.2+0.05));
+          const revenue = Math.floor(conv*(Math.random()*50000+20000));
+          const roas = +((revenue/spend)*100).toFixed(1);
+          const cpm = +((spend/impr)*1000).toFixed(1);
+          const cpc = clicks?+(spend/clicks).toFixed(1):0;
+          const ctr = +((clicks/impr)*100).toFixed(2);
+          const cpa = conv?+(spend/conv).toFixed(1):0;
+          const cvr = clicks?+((conv/clicks)*100).toFixed(2):0;
+          const aov = conv?+(revenue/conv).toFixed(1):0;
+          data.push({ date, client, media, spend, impr, clicks, conv, revenue, roas, cpm, cpc, ctr, cpa, cvr, aov });
+        });
+      });
+    });
+
+    let trendChart, channelChart, clientMediaTable, periodTable;
+
+    function applyFilters() {
+      const start = new Date(document.getElementById('startDate').value);
+      const end = new Date(document.getElementById('endDate').value);
+      const client = document.getElementById('clientFilter').value;
+      const media = document.getElementById('mediaFilter').value;
+      const filtered = data.filter(d=>{
+        const dt=new Date(d.date);
+        return dt>=start && dt<=end &&
+               (client==='전체 클라이언트'||d.client===client) &&
+               (media==='전체 매체'||d.media===media);
+      });
+      updateTrendChart(filtered);
+      updateChannelChart(filtered);
+      updateClientMediaTable(filtered);
+      updatePeriodTable(filtered);
+    }
+
+    function updateTrendChart(arr) {
+      const labels=[...new Set(arr.map(d=>d.date))].sort();
+      const spendData=labels.map(l=>arr.filter(d=>d.date===l).reduce((s,d)=>s+d.spend,0));
+      const roasData=labels.map(l=>{const g=arr.filter(d=>d.date===l);const rev=g.reduce((s,d)=>s+d.revenue,0);const sp=g.reduce((s,d)=>s+d.spend,0);return sp?+(rev/sp*100).toFixed(1):0;});
+      if(trendChart) trendChart.destroy();
+      trendChart=new Chart(document.getElementById('trendChart'),{data:{labels,datasets:[{type:'bar',label:'Spend',data:spendData,backgroundColor:'rgba(59,123,246,0.5)'},{type:'line',label:'ROAS(%)',data:roasData,borderColor:'rgba(246,88,59,0.8)',fill:false}]},options:{responsive:true,scales:{y:{beginAtZero:true}}}});
+    }
+
+    function updateChannelChart(arr) {
+      const groups=medias.filter(m=>arr.some(d=>d.media===m));
+      const spendData=groups.map(m=>arr.filter(d=>d.media===m).reduce((s,d)=>s+d.spend,0));
+      const revenueData=groups.map(m=>arr.filter(d=>d.media===m).reduce((s,d)=>s+d.revenue,0));
+      if(channelChart) channelChart.destroy();
+      channelChart=new Chart(document.getElementById('channelChart'),{data:{labels:groups,datasets:[{label:'Spend',type:'bar',data:spendData,backgroundColor:'rgba(59,146,64,0.6)'},{label:'Revenue',type:'bar',data:revenueData,backgroundColor:'rgba(64,150,199,0.6)'}]},options:{responsive:true,scales:{y:{beginAtZero:true}}}});
+    }
+
+    function updateClientMediaTable(arr) {
+      const rows=[];
+      const clientsList=[...new Set(arr.map(d=>d.client))];
+      clientsList.forEach(cl=>{
+        medias.forEach((m,i)=>{
+          const grp=arr.filter(d=>d.client===cl&&d.media===m);
+          if(grp.length){
+            const spend=grp.reduce((s,d)=>s+d.spend,0);
+            const impr=grp.reduce((s,d)=>s+d.impr,0);
+            const clicks=grp.reduce((s,d)=>s+d.clicks,0);
+            const conv=grp.reduce((s,d)=>s+d.conv,0);
+            const revenue=grp.reduce((s,d)=>s+d.revenue,0);
+            const roas=spend?+(revenue/spend*100).toFixed(1):0;
+            const cpm=impr?+((spend/impr)*1000).toFixed(1):0;
+            const cpc=clicks?+(spend/clicks).toFixed(1):0;
+            const ctr=impr?+((clicks/impr)*100).toFixed(2):0;
+            const cpa=conv?+(spend/conv).toFixed(1):0;
+            const cvr=clicks?+((conv/clicks)*100).toFixed(2):0;
+            const aov=conv?+(revenue/conv).toFixed(1):0;
+            rows.push([cl,m,spend,impr,clicks,conv,revenue,roas,cpm,cpc,ctr,cpa,cvr,aov]);
+          }
+        });
+      });
+      if(clientMediaTable) clientMediaTable.clear().rows.add(rows).draw();
+    }
+
+    function updatePeriodTable(arr) {
+      const unit=document.getElementById('periodUnit').value;
+      // 그룹 키 생성
+      const map=new Map();
+      arr.forEach(d=>{
+        let key;
+        if(unit==='day') key=d.date;
+        else {
+          const dt=new Date(d.date);
+          const weekNum = Math.ceil((((dt - new Date(dt.getFullYear(),0,1))/86400000)+new Date(dt.getFullYear(),0,1).getDay()+1)/7);
+          key=`${dt.getFullYear()}-W${weekNum}`;
+        }
+        if(!map.has(key)) map.set(key,[]);
+        map.get(key).push(d);
+      });
+      // 헤더
+      const headerCols=['Period','Spend','Impr.','Clicks','Conv.','Revenue','ROAS(%)','CPM','CPC','CTR(%)','CPA','CVR(%)','AOV'];
+      const thead=document.querySelector('#periodTable thead tr#periodHeader');
+      thead.innerHTML=''; headerCols.forEach(h=>thead.insertAdjacentHTML('beforeend',`<th>${h}</th>`));
+      // 데이터
+      const tbody=document.querySelector('#periodTable tbody'); tbody.innerHTML='';
+      Array.from(map.entries()).sort().forEach(([period,items])=>{
+        const spend=items.reduce((s,d)=>s+d.spend,0);
+        const impr=items.reduce((s,d)=>s+d.impr,0);
+        const clicks=items.reduce((s,d)=>s+d.clicks,0);
+        const conv=items.reduce((s,d)=>s+d.conv,0);
+        const revenue=items.reduce((s,d)=>s+d.revenue,0);
+        const roas=spend?+(revenue/spend*100).toFixed(1):0;
+        const cpm=impr?+((spend/impr)*1000).toFixed(1):0;
+        const cpc=clicks?+(spend/clicks).toFixed(1):0;
+        const ctr=impr?+((clicks/impr)*100).toFixed(2):0;
+        const cpa=conv?+(spend/conv).toFixed(1):0;
+        const cvr=clicks?+((conv/clicks)*100).toFixed(2):0;
+        const aov=conv?+(revenue/conv).toFixed(1):0;
+        const row=[period,spend,impr,clicks,conv,revenue,roas,cpm,cpc,ctr,cpa,cvr,aov];
+        const tr=document.createElement('tr'); row.forEach(val=>{
+          const td=document.createElement('td'); td.textContent=val; tr.appendChild(td);
+        }); tbody.appendChild(tr);
+      });
+    }
+
+    document.getElementById('applyFilters').addEventListener('click',applyFilters);
+    document.getElementById('periodUnit').addEventListener('change',()=>updatePeriodTable(data.filter(d=>{
+      const start=new Date(document.getElementById('startDate').value);
+      const end=new Date(document.getElementById('endDate').value);
+      const client=document.getElementById('clientFilter').value;
+      const media=document.getElementById('mediaFilter').value;
+      const dt=new Date(d.date);
+      return dt>=start&&dt<=end&&(client==='전체 클라이언트'||d.client===client)&&(media==='전체 매체'||d.media===media);
+    }));
+    $(document).ready(function(){
+      clientMediaTable=$('#clientMediaTable').DataTable({ordering:false,columnDefs:[{className:'dt-center',targets:'_all'}]});
+      periodTable=$('#periodTable').DataTable({ordering:false,columnDefs:[{className:'dt-center',targets:'_all'}],paging:false,searching:false,info:false});
+      document.getElementById('startDate').value=dates[0];
+      document.getElementById('endDate').value=dates[dates.length-1];
+      applyFilters();
+    });
+  </script>
+</body>
+</html>
