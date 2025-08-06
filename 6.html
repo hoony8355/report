@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>마케팅 상세 대시보드</title>
+  <title>마케팅 상세 대시보드 (리팩토링)</title>
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <!-- DataTables CSS & JS -->
@@ -30,8 +30,19 @@
     <h1>전체 클라이언트 페이지</h1>
     <div class="filters">
       <label>기간: <input type="date" id="startDate"> - <input type="date" id="endDate"></label>
-      <select id="clientFilter"><option>전체 클라이언트</option><option>Client A</option><option>Client B</option><option>Client C</option></select>
-      <select id="mediaFilter"><option>전체 매체</option><option>Google</option><option>Meta</option><option>Naver</option><option>Naver GFA</option></select>
+      <select id="clientFilter">
+        <option>전체 클라이언트</option>
+        <option>Client A</option>
+        <option>Client B</option>
+        <option>Client C</option>
+      </select>
+      <select id="mediaFilter">
+        <option>전체 매체</option>
+        <option>Google</option>
+        <option>Meta</option>
+        <option>Naver</option>
+        <option>Naver GFA</option>
+      </select>
       <button id="applyFilters">적용</button>
     </div>
   </header>
@@ -111,16 +122,18 @@
     let trendChart, channelChart, clientMediaTable;
 
     function applyFilters() {
-      const start = new Date(document.getElementById('startDate').value);
-      const end = new Date(document.getElementById('endDate').value);
-      const client = document.getElementById('clientFilter').value;
+      const start = document.getElementById('startDate').value;
+      const end   = document.getElementById('endDate').value;
+      const client= document.getElementById('clientFilter').value;
       const media = document.getElementById('mediaFilter').value;
+      console.log('Filters:', { start, end, client, media });
       const filtered = data.filter(d => {
-        const dt = new Date(d.date);
+        const dt = d.date;
         return dt >= start && dt <= end &&
-               (client==='전체 클라이언트'||d.client===client) &&
-               (media==='전체 매체'||d.media===media);
+               (client === '전체 클라이언트' || d.client === client) &&
+               (media  === '전체 매체'    || d.media  === media);
       });
+      console.log('Filtered count:', filtered.length);
       updateTrendChart(filtered);
       updateChannelChart(filtered);
       updateClientMediaTable(filtered);
@@ -130,31 +143,31 @@
     function updateTrendChart(arr) {
       const labels = [...new Set(arr.map(d=>d.date))].sort();
       const spendData = labels.map(l=>arr.filter(d=>d.date===l).reduce((s,d)=>s+d.spend,0));
-      const roasData = labels.map(l=>{
+      const roasData  = labels.map(l=>{
         const g = arr.filter(d=>d.date===l);
         const rev = g.reduce((s,d)=>s+d.revenue,0);
-        const sp = g.reduce((s,d)=>s+d.spend,0);
+        const sp  = g.reduce((s,d)=>s+d.spend,0);
         return sp?+(rev/sp*100).toFixed(1):0;
       });
       if(trendChart) trendChart.destroy();
       trendChart = new Chart(document.getElementById('trendChart'), {
         data: { labels, datasets: [
-          { type:'bar', label:'Spend', data:spendData, backgroundColor:'rgba(59,123,246,0.5)' },
-          { type:'line', label:'ROAS(%)', data:roasData, borderColor:'rgba(246,88,59,0.8)', fill:false }
-        ]}, options:{responsive:true, scales:{y:{beginAtZero:true}}}
+          { type:'bar',  label:'Spend',   data:spendData, backgroundColor:'rgba(59,123,246,0.5)' },
+          { type:'line', label:'ROAS(%)', data:roasData,  borderColor:'rgba(246,88,59,0.8)', fill:false }
+        ]}, options:{ responsive:true, scales:{ y:{ beginAtZero:true } } }
       });
     }
 
     function updateChannelChart(arr) {
       const groups = medias.filter(m=>arr.some(d=>d.media===m));
-      const spendData = groups.map(m=>arr.filter(d=>d.media===m).reduce((s,d)=>s+d.spend,0));
+      const spendData   = groups.map(m=>arr.filter(d=>d.media===m).reduce((s,d)=>s+d.spend,0));
       const revenueData = groups.map(m=>arr.filter(d=>d.media===m).reduce((s,d)=>s+d.revenue,0));
       if(channelChart) channelChart.destroy();
       channelChart = new Chart(document.getElementById('channelChart'), {
-        data: { labels:groups, datasets: [
-          { label:'Spend', type:'bar', data:spendData, backgroundColor:'rgba(59,146,64,0.6)' },
+        data: { labels:groups, datasets:[
+          { label:'Spend',   type:'bar', data:spendData,   backgroundColor:'rgba(59,146,64,0.6)' },
           { label:'Revenue', type:'bar', data:revenueData, backgroundColor:'rgba(64,150,199,0.6)' }
-        ]}, options:{responsive:true, scales:{y:{beginAtZero:true}}}
+        ]}, options:{ responsive:true, scales:{ y:{ beginAtZero:true } } }
       });
     }
 
@@ -165,18 +178,18 @@
         medias.forEach(m=>{
           const grp = arr.filter(d=>d.client===cl && d.media===m);
           if(grp.length){
-            const spend = grp.reduce((s,d)=>s+d.spend,0);
-            const impr = grp.reduce((s,d)=>s+d.impr,0);
-            const clicks = grp.reduce((s,d)=>s+d.clicks,0);
-            const conv = grp.reduce((s,d)=>s+d.conv,0);
+            const spend   = grp.reduce((s,d)=>s+d.spend,0);
+            const impr    = grp.reduce((s,d)=>s+d.impr,0);
+            const clicks  = grp.reduce((s,d)=>s+d.clicks,0);
+            const conv    = grp.reduce((s,d)=>s+d.conv,0);
             const revenue = grp.reduce((s,d)=>s+d.revenue,0);
-            const roas = spend?+(revenue/spend*100).toFixed(1):0;
-            const cpm = impr?+((spend/impr)*1000).toFixed(1):0;
-            const cpc = clicks?+(spend/clicks).toFixed(1):0;
-            const ctr = impr?+((clicks/impr)*100).toFixed(2):0;
-            const cpa = conv?+(spend/conv).toFixed(1):0;
-            const cvr = clicks?+((conv/clicks)*100).toFixed(2):0;
-            const aov = conv?+(revenue/conv).toFixed(1):0;
+            const roas    = spend?+(revenue/spend*100).toFixed(1):0;
+            const cpm     = impr?+((spend/impr)*1000).toFixed(1):0;
+            const cpc     = clicks?+(spend/clicks).toFixed(1):0;
+            const ctr     = impr?+((clicks/impr)*100).toFixed(2):0;
+            const cpa     = conv?+(spend/conv).toFixed(1):0;
+            const cvr     = clicks?+((conv/clicks)*100).toFixed(2):0;
+            const aov     = conv?+(revenue/conv).toFixed(1):0;
             rows.push([cl, m, spend, impr, clicks, conv, revenue, roas, cpm, cpc, ctr, cpa, cvr, aov]);
           }
         });
@@ -186,41 +199,37 @@
 
     function updatePeriodTable(arr) {
       const unit = document.getElementById('periodUnit').value;
-      const map = new Map();
+      const map  = new Map();
       arr.forEach(d=>{
         let key;
         if(unit==='day') key = d.date;
         else {
           const dt = new Date(d.date);
-          const weekNum = Math.ceil((((dt - new Date(dt.getFullYear(),0,1))/86400000) + new Date(dt.getFullYear(),0,1).getDay()+1)/7);
-          key = `${dt.getFullYear()}-W${weekNum}`;
+          const week = Math.ceil((((dt - new Date(dt.getFullYear(),0,1))/86400000) + new Date(dt.getFullYear(),0,1).getDay()+1)/7);
+          key = `${dt.getFullYear()}-W${week}`;
         }
         if(!map.has(key)) map.set(key,[]);
         map.get(key).push(d);
       });
       const headerCols = ['Period','Spend','Impr.','Clicks','Conv.','Revenue','ROAS(%)','CPM','CPC','CTR(%)','CPA','CVR(%)','AOV'];
-      const thead = document.getElementById('periodHeader');
-      thead.innerHTML = '';
+      const thead = document.getElementById('periodHeader'); thead.innerHTML='';
       headerCols.forEach(h=>{ const th=document.createElement('th'); th.textContent=h; thead.appendChild(th); });
-      const tbody = document.querySelector('#periodTable tbody');
-      tbody.innerHTML = '';
+      const tbody = document.querySelector('#periodTable tbody'); tbody.innerHTML='';
       Array.from(map.entries()).sort().forEach(([period, items])=>{
-        const spend = items.reduce((s,d)=>s+d.spend,0);
-        const impr = items.reduce((s,d)=>s+d.impr,0);
-        const clicks = items.reduce((s,d)=>s+d.clicks,0);
-        const conv = items.reduce((s,d)=>s+d.conv,0);
-        const revenue = items.reduce((s,d)=>s+d.revenue,0);
-        const roas = spend?+(revenue/spend*100).toFixed(1):0;
-        const cpm = impr?+((spend/impr)*1000).toFixed(1):0;
-        const cpc = clicks?+(spend/clicks).toFixed(1):0;
-        const ctr = impr?+((clicks/impr)*100).toFixed(2):0;
-        const cpa = conv?+(spend/conv).toFixed(1):0;
-        const cvr = clicks?+((conv/clicks)*100).toFixed(2):0;
-        const aov = conv?+(revenue/conv).toFixed(1):0;
-        const tr=document.createElement('tr');
-        [period, spend, impr, clicks, conv, revenue, roas, cpm, cpc, ctr, cpa, cvr, aov].forEach(val=>{
-          const td=document.createElement('td'); td.textContent=val; tr.appendChild(td);
-        });
+        const spend    = items.reduce((s,d)=>s+d.spend,0);
+        const impr     = items.reduce((s,d)=>s+d.impr,0);
+        const clicks   = items.reduce((s,d)=>s+d.clicks,0);
+        const conv     = items.reduce((s,d)=>s+d.conv,0);
+        const revenue  = items.reduce((s,d)=>s+d.revenue,0);
+        const roas     = spend?+(revenue/spend*100).toFixed(1):0;
+        const cpm      = impr?+((spend/impr)*1000).toFixed(1):0;
+        const cpc      = clicks?+(spend/clicks).toFixed(1):0;
+        const ctr      = impr?+((clicks/impr)*100).toFixed(2):0;
+        const cpa      = conv?+(spend/conv).toFixed(1):0;
+        const cvr      = clicks?+((conv/clicks)*100).toFixed(2):0;
+        const aov      = conv?+(revenue/conv).toFixed(1):0;
+        const tr = document.createElement('tr');
+        [period,spend,impr,clicks,conv,revenue,roas,cpm,cpc,ctr,cpa,cvr,aov].forEach(val=>{ const td=document.createElement('td'); td.textContent=val; tr.appendChild(td); });
         tbody.appendChild(tr);
       });
     }
@@ -230,7 +239,7 @@
     $(document).ready(function(){
       clientMediaTable = $('#clientMediaTable').DataTable({ ordering:false, columnDefs:[{ className:'dt-center', targets:'_all' }] });
       document.getElementById('startDate').value = dates[0];
-      document.getElementById('endDate').value = dates[dates.length-1];
+      document.getElementById('endDate').value   = dates[dates.length-1];
       applyFilters();
     });
   </script>
