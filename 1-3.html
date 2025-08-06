@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>클라이언트 보고서 페이지</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css">
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+  <style>
+    body { font-family:'Segoe UI',sans-serif; margin:20px; background:#f4f6f8; }
+    h1 { margin-bottom:10px; }
+    .period { font-size:0.9rem; color:#555; margin-bottom:15px; }
+    .term-toggle { margin-bottom:15px; }
+    .term-toggle button { padding:6px 12px; margin-right:10px; border:1px solid #ccc; border-radius:4px; cursor:pointer; background:#fff; }
+    .term-toggle button.active { background:#3b82f6; color:#fff; border-color:#3b82f6; }
+    .section { background:#fff; padding:20px; margin-bottom:30px; border-radius:6px; box-shadow:0 1px 3px rgba(0,0,0,0.1); }
+    .section h2 { margin-top:0; }
+    .charts { display:flex; gap:20px; margin-bottom:20px; }
+    .chart-container { flex:1; }
+    table.dataTable { width:100% !important; margin-bottom:20px; }
+    #periodTable th, #periodTable td { padding:8px; border:1px solid #ddd; }
+    #periodTable { width:100%; border-collapse:collapse; margin-bottom:20px; }
+    #periodTable th { background:#eef1f7; }
+    textarea.insight { width:100%; height:80px; padding:10px; border:1px solid #ccc; border-radius:4px; }
+    .dt-center { text-align:center; }
+    .dt-right { text-align:right; }
+  </style>
+</head>
+<body>
+  <h1>Client A 보고서</h1>
+  <div class="period">기간: 2025-07-31 ~ 2025-08-05</div>
+
+  <script>
+    // 유틸: 주차 계산
+    function getWeekKey(dateStr) {
+      const dt = new Date(dateStr);
+      const start = new Date(dt.getFullYear(), 0, 1);
+      const diff = (dt - start + ((start.getDay()+6)%7)*86400000) / 86400000;
+      return Math.ceil((diff+1)/7);
+    }
+  </script>
+
+  <script>
+    // 샘플 데이터 생성
+    const data = [];
+    const client = 'Client A';
+    const medias = ['Google','Meta','Naver','Naver GFA'];
+    const dates = ['2025-07-31','2025-08-01','2025-08-02','2025-08-03','2025-08-04','2025-08-05'];
+    dates.forEach(date => medias.forEach(media => {
+      const spend = Math.floor(Math.random()*400000)+100000;
+      const revenue = Math.floor(spend*(1+Math.random()));
+      data.push({ date, client, media, spend, revenue,
+        roas: +(revenue/spend*100).toFixed(1)
+      });
+    }));
+
+    // 섹션 정의
+    const sections = [
+      { prefix:'overall', media:null },
+      { prefix:'Google',  media:'Google'  },
+      { prefix:'Meta',    media:'Meta'    },
+      { prefix:'Naver',   media:'Naver'   },
+      { prefix:'NaverGFA', media:'Naver GFA'}
+    ];
+    const termMode = {}; // { prefix: 'short'|'long' }
+
+    // 버튼 이벤트 초기화
+    sections.forEach(sec => {
+      const p = sec.prefix;
+      termMode[p] = 'short';
+      $(`#${p}ShortBtn, #${p}LongBtn`).click(function(){
+        termMode[p] = this.id.endsWith('ShortBtn') ? 'short' : 'long';
+        $(`#${p}Toggle button`).removeClass('active');
+        $(this).addClass('active');
+        renderSection(p);
+      });
+      $(`#${p}ShortBtn`).addClass('active');
+    });
+
+    // 전체 + 매체별 섹션 생성
+    function renderSection(prefix) {
+      const sec = sections.find(s=>s.prefix===prefix);
+      let arr = data.filter(d=>d.client===client && (sec.media?d.media===sec.media:true));
+      const mode = termMode[prefix];
+      let labels, grouped;
+      if(mode==='short') {
+        labels = [...new Set(arr.map(d=>d.date))].sort();
+        grouped = labels.map(label => ({
+          label,
+          spend: arr.filter(d=>d.date===label).reduce((s,d)=>s+d.spend,0),
+          roas:  arr.filter(d=>d.date===label).reduce((s,d)=>s+d.roas,0)
+        }));
+      } else {
+        const weekKeys = [...new Set(arr.map(d=>getWeekKey(d.date)))].sort();
+        grouped = weekKeys.map(wk => {
+          const items = arr.filter(d=>getWeekKey(d.date)===wk);
+          return {
+            label: `W${wk}`,
+            spend: items.reduce((s,d)=>s+d.spend,0),
+            roas:  items.reduce((s,d)=>s+d.roas,0)/items.length
+          };
+        });
+      }
+      const chartLabels = grouped.map(g=>g.label);
+      const spendData  = grouped.map(g=>g.spend);
+      const roasData   = grouped.map(g=>+g.roas.toFixed(1));
+      // 차트 렌더링
+      new Chart(document.getElementById(`${prefix}TrendChart`),{
+        data:{labels:chartLabels,datasets:[
+          {type:'bar',label:'Spend',data:spendData,yAxisID:'y',backgroundColor:'rgba(59,123,246,0.5)'},
+          {type:'line',label:'ROAS(%)',data:roasData,yAxisID:'y1',borderColor:'rgba(246,88,59,0.8)',fill:false}
+        ]},options:{responsive:true,scales:{y:{title:{display:true,text:'Spend'}},y1:{position:'right',grid:{drawOnChartArea:false},title:{display:true,text:'ROAS(%)'}}}}
+      });
+      // 매체별 비교 차트 (전체 섹션만) 아니면 숨김
+      const channelArr = arr;
+      const channels = [...new Set(channelArr.map(d=>d.media))];
+      const spendByCh = channels.map(m=>channelArr.filter(d=>d.media===m).reduce((s,d)=>s+d.spend,0));
+      const revByCh   = channels.map(m=>channelArr.filter(d=>d.media===m).reduce((s,d)=>s+d.revenue,0));
+      new Chart(document.getElementById(`${prefix}ChannelChart`),{
+        data:{labels:channels,datasets:[
+          {label:'Spend',type:'bar',data:spendByCh,yAxisID:'y',backgroundColor:'rgba(59,146,64,0.6)'},
+          {label:'Revenue',type:'bar',data:revByCh,yAxisID:'y1',backgroundColor:'rgba(64,150,199,0.6)'}
+        ]},options:{responsive:true,scales:{y:{title:{display:true,text:'Spend'}},y1:{position:'right',grid:{drawOnChartArea:false},title:{display:true,text:'Revenue'}}}}
+      });
+      // 매체 테이블 업데이트
+      const table = $(`#${prefix}MediaTable`).DataTable();
+      table.clear();
+      channels.forEach(m=>{
+        const grp = arr.filter(d=>d.media===m);
+        table.row.add([client, m, grp.reduce((s,d)=>s+d.spend,0).toLocaleString(), grp.reduce((s,d)=>s+d.revenue,0).toLocaleString(), (grp.reduce((s,d)=>s+d.roas,0)/grp.length).toFixed(1)]);
+      });
+      table.draw();
+      // 기간별 테이블
+      const tbody = document.querySelector(`#${prefix}PeriodTable tbody`);
+      const thead = document.getElementById(`${prefix}PeriodHeader`);
+      thead.innerHTML = '<th class="dt-center">Period</th><th class="dt-right">Spend</th><th class="dt-right">Revenue</th><th class="dt-right">ROAS</th>';
+      tbody.innerHTML = '';
+      grouped.forEach(g=>{
+        const tr = document.createElement('tr');
+        const vals = [g.label, g.spend.toLocaleString(), (channelArr.filter(d=>d.date===g.label).length?0:0), g.roas.toLocaleString()];
+        // 채워진 값
+        [g.label, g.spend, g.roas].forEach((v,i)=>{ const td=document.createElement('td'); td.textContent=i? v.toLocaleString() : v; td.style.textAlign=i?'right':'center'; tr.appendChild(td); });
+        tbody.appendChild(tr);
+      });
+    }
+
+    $(document).ready(function(){
+      // DataTables init
+      sections.forEach(sec=>{ $(`#${sec.prefix}MediaTable`).DataTable({columns:[{title:'Client'},{title:'Media'},{title:'Spend'},{title:'Revenue'},{title:'ROAS'}],ordering:false, info:false,paging:false, searching:false, columnDefs:[{className:'dt-center',targets:[0,1]},{className:'dt-right',targets:[2,3,4]}]}); });
+      sections.forEach(sec=>renderSection(sec.prefix));
+    });
+  </script>
+</body>
+</html>
