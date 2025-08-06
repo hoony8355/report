@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>마케팅 대시보드 예시 (간소화 버전)</title>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- DataTables CSS & JS -->
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css">
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+  <style>
+    body { font-family: 'Segoe UI', sans-serif; margin: 20px; background: #f4f6f8; }
+    header, section { margin-bottom: 30px; }
+    .filters { display: flex; flex-wrap: wrap; gap: 15px; }
+    .filters select, .filters input[type=date], .filters button { padding: 6px 8px; border: 1px solid #ccc; border-radius: 4px; }
+    .chart-container { background: #fff; padding: 20px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 20px; }
+    .chart-container h4 { margin-bottom: 10px; font-size: 1.1rem; color: #333; }
+    table.dataTable { width: 100% !important; background: #fff; border-radius: 6px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>마케팅 데이터 대시보드</h1>
+    <div class="filters">
+      <label>기간: <input type="date" id="startDate"> - <input type="date" id="endDate"></label>
+      <select id="clientFilter"><option>전체 클라이언트</option><option>Client A</option><option>Client B</option><option>Client C</option></select>
+      <select id="mediaFilter"><option>전체 매체</option><option>Google</option><option>Meta</option><option>Naver</option><option>Naver GFA</option></select>
+      <button id="applyFilters">적용</button>
+    </div>
+  </header>
+
+  <section class="chart-container">
+    <h4>기간별 Spend vs ROAS</h4>
+    <canvas id="trendChart"></canvas>
+  </section>
+
+  <section class="chart-container">
+    <h4>매체별 Spend vs Revenue</h4>
+    <canvas id="channelChart"></canvas>
+  </section>
+
+  <section>
+    <h2>상세 데이터 테이블</h2>
+    <table id="dataTable" class="display"></table>
+  </section>
+
+  <script>
+    // 샘플 데이터 생성 (6일치 × 3클라이언트 × 4매체)
+    const data = [];
+    const clients = ['Client A','Client B','Client C'];
+    const medias = ['Google','Meta','Naver','Naver GFA'];
+    const dates = ['2025-07-31','2025-08-01','2025-08-02','2025-08-03','2025-08-04','2025-08-05'];
+    dates.forEach(date => {
+      clients.forEach(client => {
+        medias.forEach(media => {
+          const spend = Math.floor(Math.random() * 400000) + 100000;
+          const revenue = Math.floor(spend * (1 + Math.random()));
+          const roas = ((revenue / spend) * 100).toFixed(1);
+          data.push({ date, client, media, spend, revenue, roas });
+        });
+      });
+    });
+
+    let trendChart, channelChart, table;
+
+    function applyFilters() {
+      const start = new Date(document.getElementById('startDate').value);
+      const end = new Date(document.getElementById('endDate').value);
+      const client = document.getElementById('clientFilter').value;
+      const media = document.getElementById('mediaFilter').value;
+
+      const filtered = data.filter(d => {
+        const dt = new Date(d.date);
+        return dt >= start && dt <= end &&
+               (client === '전체 클라이언트' || d.client === client) &&
+               (media === '전체 매체' || d.media === media);
+      });
+
+      updateTrendChart(filtered);
+      updateChannelChart(filtered);
+      updateTable(filtered);
+    }
+
+    function updateTrendChart(arr) {
+      const labels = [...new Set(arr.map(d => d.date))];
+      const spendData = labels.map(l => arr.filter(d => d.date === l).reduce((s, d) => s + d.spend, 0));
+      const roasData = labels.map(l => {
+        const group = arr.filter(d => d.date === l);
+        const rev = group.reduce((s, d) => s + d.revenue, 0);
+        const sp = group.reduce((s, d) => s + d.spend, 0);
+        return sp ? (rev / sp * 100).toFixed(1) : 0;
+      });
+      if (trendChart) trendChart.destroy();
+      trendChart = new Chart(document.getElementById('trendChart'), {
+        data: {
+          labels,
+          datasets: [
+            { type: 'bar', label: 'Spend', data: spendData, backgroundColor: 'rgba(59, 123, 246, 0.5)' },
+            { type: 'line', label: 'ROAS(%)', data: roasData, borderColor: 'rgba(246, 88, 59, 0.8)', fill: false }
+          ]
+        },
+        options: { responsive: true, scales: { y: { beginAtZero: true } } }
+      });
+    }
+
+    function updateChannelChart(arr) {
+      const groups = medias.filter(m => arr.some(d => d.media === m));
+      const spendData = groups.map(m => arr.filter(d => d.media === m).reduce((s, d) => s + d.spend, 0));
+      const revenueData = groups.map(m => arr.filter(d => d.media === m).reduce((s, d) => s + d.revenue, 0));
+      if (channelChart) channelChart.destroy();
+      channelChart = new Chart(document.getElementById('channelChart'), {
+        data: {
+          labels: groups,
+          datasets: [
+            { label: 'Spend', type: 'bar', data: spendData, backgroundColor: 'rgba(59, 146, 64, 0.6)' },
+            { label: 'Revenue', type: 'bar', data: revenueData, backgroundColor: 'rgba(64, 150, 199, 0.6)' }
+          ]
+        },
+        options: { responsive: true, scales: { y: { beginAtZero: true } } }
+      });
+    }
+
+    function updateTable(arr) {
+      const cols = ['date', 'client', 'media', 'spend', 'revenue', 'roas'];
+      const tableData = arr.map(d => cols.map(k => d[k]));
+      if (table) table.clear().rows.add(tableData).draw();
+    }
+
+    document.getElementById('applyFilters').addEventListener('click', applyFilters);
+    $(document).ready(function() {
+      table = $('#dataTable').DataTable({
+        columns: [
+          { title: '날짜' }, { title: '클라이언트' }, { title: '매체' },
+          { title: 'Spend' }, { title: 'Revenue' }, { title: 'ROAS(%)' }
+        ]
+      });
+      const today = dates[dates.length - 1];
+      document.getElementById('startDate').value = dates[0];
+      document.getElementById('endDate').value = today;
+      applyFilters();
+    });
+  </script>
+</body>
+</html>
