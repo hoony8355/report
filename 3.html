@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>전문가용 마케팅 대시보드</title>
+  <title>전문가용 마케팅 대시보드 (샘플 데이터 포함)</title>
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <!-- Chart.js Funnel Plugin -->
@@ -16,7 +16,7 @@
     body { font-family: 'Segoe UI', sans-serif; margin: 20px; background: #f4f6f8; }
     header, section { margin-bottom: 30px; }
     .filters { display: flex; flex-wrap: wrap; gap: 15px; }
-    .filters select, .filters input[type=date] { padding: 6px 8px; border: 1px solid #ccc; border-radius: 4px; }
+    .filters select, .filters input[type=date], .filters button { padding: 6px 8px; border: 1px solid #ccc; border-radius: 4px; }
     .kpi-cards { display: flex; gap: 20px; flex-wrap: wrap; }
     .kpi-card { flex: 1; min-width: 140px; background: #fff; padding: 15px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); text-align: center; }
     .kpi-card h3 { margin: 0 0 10px; font-size: 1rem; color: #555; }
@@ -72,11 +72,28 @@
   </section>
 
   <script>
-    // 샘플 데이터 구조
-    const data = [
-      { date:'2025-07-01', client:'Client A', media:'Google', segment:'브랜드', spend:200000, revenue:400000, roas:200, ctr:3.2, cpc:500, cpa:2000, impressions:100000, clicks:3200, conv:200 },
-      // ... 더미 데이터 추가 가능
-    ];
+    // 가상의 샘플 데이터 (6일치 / 3개 클라이언트 × 3개 매체)
+    const data = [];
+    const clients = ['Client A','Client B','Client C'];
+    const medias = ['Google','Meta','Naver'];
+    const dates = ['2025-07-31','2025-08-01','2025-08-02','2025-08-03','2025-08-04','2025-08-05'];
+    dates.forEach(date => {
+      clients.forEach(client => {
+        medias.forEach(media => {
+          const spend = Math.floor(Math.random() * 400000) + 100000;
+          const revenue = Math.floor(spend * (1 + Math.random()));
+          const roas = ((revenue / spend) * 100).toFixed(1);
+          const impressions = Math.floor(spend * 2 + Math.random() * 10000);
+          const clicks = Math.floor(impressions * (Math.random() * 0.02 + 0.01));
+          const ctr = ((clicks / impressions) * 100).toFixed(2);
+          const cpc = clicks ? (spend / clicks).toFixed(1) : 0;
+          const conv = Math.floor(clicks * (Math.random() * 0.1 + 0.05));
+          const cpa = conv ? (spend / conv).toFixed(1) : 0;
+          const segment = client==='Client A'? '브랜드' : client==='Client B'? '퍼포먼스':'디스플레이';
+          data.push({ date, client, media, segment, spend, revenue, roas, impressions, clicks, ctr, cpc, conv, cpa });
+        });
+      });
+    });
 
     let trendChart, channelChart, funnelChart, segmentationChart, socialChart, seoChart, ecomChart;
     let table;
@@ -87,10 +104,10 @@
       const client = document.getElementById('clientFilter').value;
       const media = document.getElementById('mediaFilter').value;
       const segment = document.getElementById('segmentFilter').value;
-
+      
       const filtered = data.filter(d => {
-        const date = new Date(d.date);
-        return date>=start && date<=end &&
+        const dt = new Date(d.date);
+        return dt>=start && dt<=end &&
                (client==='전체 클라이언트'||d.client===client) &&
                (media==='전체 매체'||d.media===media) &&
                (segment==='전체 캠페인'||d.segment===segment);
@@ -109,13 +126,16 @@
 
     function updateKPIs(arr) {
       const sum = arr.reduce((a,d)=>({
-        spend:a.spend+d.spend, revenue:a.revenue+d.revenue,
-        conv:a.conv+d.conv, clicks:a.clicks+d.clicks
-      }),{spend:0,revenue:0,conv:0,clicks:0});
-      const roas = sum.revenue?((sum.revenue/sum.spend)*100).toFixed(1):0;
-      const ctr = sum.impressions?((sum.clicks/sum.impressions)*100).toFixed(1):0;
-      const cpc = sum.clicks?((sum.spend/sum.clicks).toFixed(1)):0;
-      const cpa = sum.conv?((sum.spend/sum.conv).toFixed(1)):0;
+        spend:a.spend+d.spend,
+        revenue:a.revenue+d.revenue,
+        impressions:a.impressions+d.impressions,
+        clicks:a.clicks+d.clicks,
+        conv:a.conv+d.conv
+      }),{spend:0,revenue:0,impressions:0,clicks:0,conv:0});
+      const roas = sum.spend?((sum.revenue/sum.spend)*100).toFixed(1):0;
+      const ctr = sum.impressions?((sum.clicks/sum.impressions)*100).toFixed(2):0;
+      const cpc = sum.clicks?(sum.spend/sum.clicks).toFixed(1):0;
+      const cpa = sum.conv?(sum.spend/sum.conv).toFixed(1):0;
       document.getElementById('kpiSpend').textContent = sum.spend.toLocaleString();
       document.getElementById('kpiRevenue').textContent = sum.revenue.toLocaleString();
       document.getElementById('kpiRoas').textContent = roas+'%';
@@ -138,7 +158,7 @@
         data:{labels,datasets:[
           {label:'Spend', data:spendData, backgroundColor:'rgba(59,123,246,0.5)', type:'bar'},
           {label:'ROAS', data:roasData, borderColor:'rgba(246,88,59,0.8)', type:'line', fill:false}
-        ]},options:{responsive:true}
+        ]},options:{responsive:true, scales:{y: { beginAtZero:true }}}
       });
     }
 
@@ -151,7 +171,7 @@
         type:'bar',data:{labels:channels,datasets:[
           {label:'Spend',data:spendData,backgroundColor:'rgba(59,146,64,0.6)'},
           {label:'Revenue',data:revenueData,backgroundColor:'rgba(64,150,199,0.6)'}
-        ]},options:{responsive:true}
+        ]},options:{responsive:true, scales:{y: { beginAtZero:true }}}
       });
     }
 
@@ -175,22 +195,23 @@
     }
 
     function updateSocialChart(arr) {
-      // 샘플: 팔로워, 언급량
       const labels=['Twitter','Instagram','Facebook'];
       const dataVal=[12000,18000,9000];
       if(socialChart) socialChart.destroy();
       socialChart = new Chart(document.getElementById('socialChart'),{type:'bar',data:{labels,datasets:[{label:'Mentions',data:dataVal,backgroundColor:'rgba(155,89,182,0.6)'}]},options:{responsive:true}});
     }
+
     function updateSeoChart(arr) {
       const labels=['Organic','Referral','Social','Paid'];
       const dataVal=[55000,12000,18000,9000];
       if(seoChart) seoChart.destroy();
       seoChart = new Chart(document.getElementById('seoChart'),{type:'doughnut',data:{labels,datasets:[{data:dataVal,backgroundColor:['#27ae60','#2980b9','#8e44ad','#e67e22']}]},options:{responsive:true}});
     }
+
     function updateEcomChart(arr) {
-      const aov = arr.length? (arr.reduce((s,d)=>s+d.revenue,0)/arr.reduce((s,d)=>s+d.conv,0)).toFixed(1) : 0;
+      const aov = arr.reduce((s,d)=>s+d.revenue,0)/Math.max(1,arr.reduce((s,d)=>s+d.conv,0)).toFixed(1);
       const orders = arr.reduce((s,d)=>s+d.conv,0);
-      const cartAbandon = 20; // 샘플
+      const cartAbandon = 20;
       if(ecomChart) ecomChart.destroy();
       ecomChart = new Chart(document.getElementById('ecomChart'),{type:'bar',data:{labels:['AOV','Orders','Cart Abandon%'],datasets:[{label:'Value',data:[aov,orders,cartAbandon],backgroundColor:'rgba(231,76,60,0.6)'}]},options:{responsive:true}});
     }
@@ -209,8 +230,8 @@
         {title:'CPC'},{title:'CPA'}
       ]});
       const today = new Date().toISOString().slice(0,10);
-      document.getElementById('startDate').value = today;
-      document.getElementById('endDate').value = today;
+      document.getElementById('startDate').value = dates[0];
+      document.getElementById('endDate').value = dates[dates.length-1];
       applyFilters();
     });
 
