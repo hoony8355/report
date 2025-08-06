@@ -1,17 +1,17 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>클라이언트 보고서 페이지</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css" />
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css">
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
   <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
   <style>
     body { font-family: 'Segoe UI', sans-serif; margin: 20px; background: #f4f6f8; }
     h1 { margin-bottom: 5px; }
-    .period { font-size: 0.9rem; color: #555; margin-bottom: 15px; }
+    .period { font-size: .9rem; color: #555; margin-bottom: 15px; }
     .term-toggle { margin-bottom: 15px; }
     .term-toggle button { padding: 6px 12px; margin-right: 8px; border: 1px solid #ccc; border-radius: 4px; background: #fff; cursor: pointer; }
     .term-toggle button.active { background: #3b82f6; color: #fff; border-color: #3b82f6; }
@@ -20,8 +20,6 @@
     .charts { display: flex; gap: 20px; margin-bottom: 20px; }
     .chart-container { flex: 1; }
     table.dataTable { width: 100% !important; margin-bottom: 20px; }
-    table th, table td { padding: 8px; border: 1px solid #ddd; }
-    table th { background: #eef1f7; }
     textarea.insight { width: 100%; height: 80px; padding: 10px; border: 1px solid #ccc; border-radius: 4px; }
     .dt-center { text-align: center; }
     .dt-right  { text-align: right; }
@@ -32,6 +30,7 @@
   <div class="period">기간: 2025-07-31 ~ 2025-08-05</div>
 
   <script>
+    // 날짜/주차 라벨
     function getLastNDates(n) {
       const arr = [];
       const end = new Date('2025-08-05');
@@ -43,21 +42,25 @@
       return arr;
     }
     const dailyDates = getLastNDates(7);
-    const weeklyLabels = Array.from({length:8}, (_,i) => `W${i+1}`);
+    const weeklyLabels = Array.from({length:8},(_,i)=>`W${i+1}`);
   </script>
 
   <script>
     const sections = ['overall','Google','Meta','Naver','NaverGFA'];
     const mediaMap = {
       overall: ['Google','Meta','Naver','Naver GFA'],
-      Google: ['Google'], Meta: ['Meta'], Naver: ['Naver'], NaverGFA: ['Naver GFA']
+      Google: ['Google'],
+      Meta: ['Meta'],
+      Naver: ['Naver'],
+      NaverGFA: ['Naver GFA']
     };
+    // 샘플 데이터 생성
     const sampleData = {};
     sections.forEach(sec => {
       sampleData[sec] = {
         short: dailyDates.map(date => {
           const spend = Math.floor(Math.random()*400000)+100000;
-          const impr  = Math.floor(spend*2 + Math.random()*10000);
+          const impr  = Math.floor(spend*2 + Math.random()*5000);
           const clicks= Math.floor(impr*(Math.random()*0.02+0.01));
           const conv  = Math.floor(clicks*(Math.random()*0.2+0.05));
           const revenue = Math.floor(conv*(Math.random()*50000+20000));
@@ -72,7 +75,7 @@
         }),
         long: weeklyLabels.map(w => {
           const spend = Math.floor(Math.random()*2000000)+500000;
-          const impr  = Math.floor(spend*2 + Math.random()*50000);
+          const impr  = Math.floor(spend*2 + Math.random()*20000);
           const clicks= Math.floor(impr*(Math.random()*0.02+0.01));
           const conv  = Math.floor(clicks*(Math.random()*0.2+0.05));
           const revenue = Math.floor(conv*(Math.random()*50000+20000));
@@ -91,8 +94,9 @@
   </script>
 
   <script>
+    // 섹션 생성
     sections.forEach(sec => {
-      const title = sec==='overall'? '전체' : sec.replace('GFA',' GFA');
+      const title = sec==='overall' ? '전체' : sec.replace('GFA',' GFA');
       document.write(`
         <div class="section" id="section-${sec}">
           <h2>${title}</h2>
@@ -104,7 +108,7 @@
             <div class="chart-container"><canvas id="${sec}TrendChart"></canvas></div>
             <div class="chart-container"><canvas id="${sec}ChannelChart"></canvas></div>
           </div>
-          <table id="${sec}DataTable" class="display"></table>
+          <table id="${sec}SummaryTable" class="display"></table>
           <div><strong>인사이트 (${title}):</strong>
             <textarea id="${sec}Insight" class="insight" placeholder="${title} 인사이트 작성..."></textarea>
           </div>
@@ -115,49 +119,42 @@
 
   <script>
     function renderSection(sec) {
-      const arr = sampleData[sec][termMode[sec]];
-      const labels = arr.map(d=>d.period);
-      const spend  = arr.map(d=>d.spend);
-      const roas   = arr.map(d=>d.roas);
+      const dataArr = sampleData[sec][termMode[sec]];
+      const labels = dataArr.map(d=>d.period);
+      const spendData = dataArr.map(d=>d.spend);
+      const roasData  = dataArr.map(d=>d.roas);
+      // Trend Chart
       new Chart(document.getElementById(`${sec}TrendChart`),{
         data:{labels,datasets:[
-          {type:'bar',label:'광고비용',data:spend,yAxisID:'y',backgroundColor:'rgba(59,123,246,0.5)'},
-          {type:'line',label:'ROAS(%)',data:roas,yAxisID:'y1',borderColor:'rgba(246,88,59,0.8)',fill:false}
+          {type:'bar', label:'광고비용', data:spendData, yAxisID:'y', backgroundColor:'rgba(59,123,246,0.5)'},
+          {type:'line',label:'ROAS(%)', data:roasData, yAxisID:'y1', borderColor:'rgba(246,88,59,0.8)', fill:false}
         ]},options:{responsive:true,scales:{y:{title:{display:true,text:'광고비용'}},y1:{position:'right',grid:{drawOnChartArea:false},title:{display:true,text:'ROAS(%)'}}}}
       });
-      const mediaList = mediaMap[sec];
-      const spendBy = mediaList.map(m=>arr.reduce((s,d)=>s+d.spend,0));
-      const revBy   = mediaList.map(m=>arr.reduce((s,d)=>s+d.revenue,0));
-      new Chart(document.getElementById(`${sec}ChannelChart`),{
-        data:{labels:mediaList,datasets:[
-          {label:'광고비용',type:'bar',data:spendBy,yAxisID:'y',backgroundColor:'rgba(59,146,64,0.6)'},
-          {label:'매출액',type:'bar',data:revBy,yAxisID:'y1',backgroundColor:'rgba(64,150,199,0.6)'}
-        ]},options:{responsive:true,scales:{y:{title:{display:true,text:'광고비용'}},y1:{position:'right',grid:{drawOnChartArea:false},title:{display:true,text:'매출액'}}}}
-      });
-      // 통합 테이블: 첫 행 총계, 이후 일/주별
-      const total = arr.reduce((a,d)=>{Object.keys(d).forEach(k=>{if(k!=='period') a[k]=(a[k]||0)+d[k];}); return a;},{});
-      const dt = $(`#${sec}DataTable`).DataTable({ destroy:true });
-      const cols = ['Period','광고비용','노출수','클릭수','구매수','매출액','ROAS','CPM','CPC','CTR','CPA','CVR'];
-      dt.clear();
-      dt.columns().every((i) => { $(dt.column(i).header()).text(cols[i]); });
-      // 총계 행
-      dt.row.add([
-        '총계',
-        total.spend.toLocaleString(), total.impr.toLocaleString(), total.clicks.toLocaleString(), total.conv.toLocaleString(), total.revenue.toLocaleString(),
-        (total.roas/arr.length).toFixed(1), (total.cpm/arr.length).toFixed(1), (total.cpc/arr.length).toFixed(1), (total.ctr/arr.length).toFixed(2), (total.cpa/arr.length).toFixed(1), (total.cvr/arr.length).toFixed(2)
-      ]);
-      // 기간별
-      arr.forEach(d=>{
-        dt.row.add([
-          d.period,
-          d.spend.toLocaleString(), d.impr.toLocaleString(), d.clicks.toLocaleString(), d.conv.toLocaleString(), d.revenue.toLocaleString(),
-          d.roas.toLocaleString(), d.cpm.toLocaleString(), d.cpc.toLocaleString(), d.ctr.toLocaleString(), d.cpa.toLocaleString(), d.cvr.toLocaleString()
-        ]);
-      });
-      dt.settings()[0].oInit.ordering = false;
-      dt.draw();
-      // 정렬
-      dt.columns().every((i) => {
+      // Channel Chart
+      const medias = mediaMap[sec];
+      const sumSpend = dataArr.reduce((sum,d)=>sum+d.spend,0);
+      const sumImpr  = dataArr.reduce((sum,d)=>sum+d.impr,0);
+      const sumClick = dataArr.reduce((sum,d)=>sum+d.clicks,0);
+      const sumConv  = dataArr.reduce((sum,d)=>sum+d.conv,0);
+      const sumRev   = dataArr.reduce((sum,d)=>sum+d.revenue,0);
+      // Summary + Period Rows
+      const total = { period:'총계', spend:sumSpend, impr:sumImpr, clicks:sumClick, conv:sumConv, revenue:sumRev,
+        roas:(sumRev/sumSpend*100).toFixed(1), cpm:(sumSpend/sumImpr*1000).toFixed(1),
+        cpc:(sumSpend/sumClick).toFixed(1), ctr:(sumClick/sumImpr*100).toFixed(2), cpa:(sumSpend/sumConv).toFixed(1), cvr:(sumConv/sumClick*100).toFixed(2)
+      };
+      const rows = [total, ...dataArr];
+      // Render Table
+      const dt = $(`#${sec}SummaryTable`).DataTable({ destroy:true, data: rows.map(r=>[
+        r.period,
+        r.spend.toLocaleString(), r.impr.toLocaleString(), r.clicks.toLocaleString(), r.conv.toLocaleString(), r.revenue.toLocaleString(),
+        r.roas, r.cpm, r.cpc, r.ctr, r.cpa, r.cvr
+      ]),
+      columns:[
+        { title:'기간' }, { title:'광고비용' },{ title:'노출수' },{ title:'클릭수' },{ title:'구매수' },{ title:'매출액' },
+        { title:'ROAS(%)' },{ title:'CPM' },{ title:'CPC' },{ title:'CTR(%)' },{ title:'CPA' },{ title:'CVR(%)' }
+      ],
+      ordering:false, paging:false, info:false, searching:false });
+      dt.columns().every((i)=>{
         $(dt.column(i).header()).css('text-align', i===0?'center':'right');
         dt.column(i).nodes().to$().css('text-align', i===0?'center':'right');
       });
@@ -165,17 +162,12 @@
 
     $(document).ready(()=>{
       sections.forEach(sec=>{
-        $(`#${sec}ShortBtn, #${sec}LongBtn`).click(function(){
-          termMode[sec] = this.id.endsWith('ShortBtn')?'short':'long';
-          $(`#${sec}Toggle button`).removeClass('active'); $(this).addClass('active');
-          renderSection(sec);
-        });
         $(`#${sec}ShortBtn`).addClass('active');
-        // DataTable 초기화
-        $(`#${sec}DataTable`).DataTable({
-          data: [],
-          columns: cols.map(c=>({ title:c })),
-          paging:false, info:false, searching:false
+        $(`#${sec}ShortBtn,#${sec}LongBtn`).click(function(){
+          termMode[sec] = this.id.endsWith('ShortBtn')?'short':'long';
+          $(`#${sec}Toggle button`).removeClass('active');
+          $(this).addClass('active');
+          renderSection(sec);
         });
         renderSection(sec);
       });
