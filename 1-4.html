@@ -25,7 +25,7 @@
     #periodTable th { background: #eef1f7; }
     textarea.insight { width: 100%; height: 80px; padding: 10px; border: 1px solid #ccc; border-radius: 4px; }
     .dt-center { text-align: center; }
-    .dt-right { text-align: right; }
+    .dt-right  { text-align: right; }
   </style>
 </head>
 <body>
@@ -44,17 +44,23 @@
       return arr;
     }
     const dailyDates = getLastNDates(7);
-    const weeklyLabels = Array.from({length:8},(_,i)=>`W${i+1}`);
+    const weeklyLabels = Array.from({length:8}, (_,i) => `W${i+1}`);
   </script>
 
   <script>
+    // 섹션 리스트 및 미디어 매핑
     const sections = ['overall','Google','Meta','Naver','NaverGFA'];
     const mediaMap = {
       overall: ['Google','Meta','Naver','Naver GFA'],
-      Google: ['Google'], Meta: ['Meta'], Naver: ['Naver'], NaverGFA: ['Naver GFA']
+      Google:  ['Google'],
+      Meta:    ['Meta'],
+      Naver:   ['Naver'],
+      NaverGFA:['Naver GFA']
     };
+    // 샘플 데이터 준비
     const sampleData = {};
     sections.forEach(sec => {
+      // 단기/장기데이터 생성
       sampleData[sec] = {
         short: dailyDates.map(date => {
           const spend = Math.floor(Math.random()*400000)+100000;
@@ -62,9 +68,7 @@
           const clicks= Math.floor(impr*(Math.random()*0.02+0.01));
           const conv  = Math.floor(clicks*(Math.random()*0.2+0.05));
           const revenue = Math.floor(conv*(Math.random()*50000+20000));
-          return {
-            period: date,
-            spend, impr, clicks, conv, revenue,
+          return { period: date, spend, impr, clicks, conv, revenue,
             roas: +(revenue/spend*100).toFixed(1),
             cpm: +(spend/impr*1000).toFixed(1),
             cpc: clicks?+(spend/clicks).toFixed(1):0,
@@ -79,9 +83,7 @@
           const clicks= Math.floor(impr*(Math.random()*0.02+0.01));
           const conv  = Math.floor(clicks*(Math.random()*0.2+0.05));
           const revenue = Math.floor(conv*(Math.random()*50000+20000));
-          return {
-            period: w,
-            spend, impr, clicks, conv, revenue,
+          return { period: w, spend, impr, clicks, conv, revenue,
             roas: +(revenue/spend*100).toFixed(1),
             cpm: +(spend/impr*1000).toFixed(1),
             cpc: clicks?+(spend/clicks).toFixed(1):0,
@@ -96,21 +98,21 @@
   </script>
 
   <script>
-    // HTML 섹션 생성
+    // 각 섹션 HTML 생성
     sections.forEach(sec => {
-      const title = sec==='overall'?'전체':sec.replace('GFA',' GFA');
+      const title = sec==='overall'? '전체' : sec.replace('GFA',' GFA');
       document.write(`
         <div class="section" id="section-${sec}">
           <h2>${title}</h2>
           <div class="term-toggle" id="${sec}Toggle">
-            <button id="${sec}ShortBtn">단기(1주)</button>
+            <button id="${sec}ShortBtn">단기(7일)</button>
             <button id="${sec}LongBtn">장기(8주)</button>
           </div>
           <div class="charts">
             <div class="chart-container"><canvas id="${sec}TrendChart"></canvas></div>
             <div class="chart-container"><canvas id="${sec}ChannelChart"></canvas></div>
           </div>
-          <table id="${sec}MediaTable" class="display"></table>
+          <table id="${sec}SummaryTable" class="display"></table>
           <table id="${sec}PeriodTable">
             <thead><tr id="${sec}PeriodHeader"></tr></thead>
             <tbody></tbody>
@@ -129,60 +131,72 @@
       const labels = arr.map(d=>d.period);
       const spend  = arr.map(d=>d.spend);
       const roas   = arr.map(d=>d.roas);
-
       // Trend Chart
       new Chart(document.getElementById(`${sec}TrendChart`),{
-        data:{ labels, datasets:[
-          { type:'bar', label:'광고비용', data:spend, yAxisID:'y', backgroundColor:'rgba(59,123,246,0.5)' },
-          { type:'line',label:'ROAS(%)',  data:roas, yAxisID:'y1', borderColor:'rgba(246,88,59,0.8)', fill:false }
-        ] },
-        options:{ responsive:true, scales:{
-          y:  { title:{display:true,text:'광고비용'} },
-          y1: { position:'right', grid:{drawOnChartArea:false}, title:{display:true,text:'ROAS(%)'} }
-        }}
+        data:{labels,datasets:[
+          {type:'bar',label:'광고비용',data:spend,yAxisID:'y',backgroundColor:'rgba(59,123,246,0.5)'},
+          {type:'line',label:'ROAS(%)',data:roas,yAxisID:'y1',borderColor:'rgba(246,88,59,0.8)',fill:false}
+        ]},options:{responsive:true,scales:{y:{title:{display:true,text:'광고비용'}},y1:{position:'right',grid:{drawOnChartArea:false},title:{display:true,text:'ROAS(%)'}}}}
       });
-
       // Channel Chart
-      const mediaList = mediaMap[sec];
-      const channelSpend = mediaList.map(m=>arr.filter(d=>d.period).reduce((s,d)=>s+d.spend,0));
-      const channelRev   = mediaList.map(m=>arr.filter(d=>d.period).reduce((s,d)=>s+d.revenue,0));
+      const medias = mediaMap[sec];
+      const spendBy = medias.map(m=>arr.reduce((s,d)=>s+d.spend,0));
+      const revBy   = medias.map(m=>arr.reduce((s,d)=>s+d.revenue,0));
       new Chart(document.getElementById(`${sec}ChannelChart`),{
-        data:{ labels:mediaList, datasets:[
-          { label:'광고비용', type:'bar', data:channelSpend, yAxisID:'y', backgroundColor:'rgba(59,146,64,0.6)' },
-          { label:'매출액',   type:'bar', data:channelRev,   yAxisID:'y1', backgroundColor:'rgba(64,150,199,0.6)' }
-        ] },
-        options:{ responsive:true, scales:{
-          y:  { title:{display:true,text:'광고비용'} },
-          y1: { position:'right', grid:{drawOnChartArea:false}, title:{display:true,text:'매출액'} }
-        }}
+        data:{labels:medias,datasets:[
+          {label:'광고비용',type:'bar',data:spendBy,yAxisID:'y',backgroundColor:'rgba(59,146,64,0.6)'},
+          {label:'매출액',  type:'bar',data:revBy,  yAxisID:'y1',backgroundColor:'rgba(64,150,199,0.6)'}
+        ]},options:{responsive:true,scales:{y:{title:{display:true,text:'광고비용'}},y1:{position:'right',grid:{drawOnChartArea:false},title:{display:true,text:'매출액'}}}}
       });
-
-      // Media Summary Table
-      const dt = $(`#${sec}MediaTable`).DataTable({ destroy:true });
-      dt.clear();
-      mediaList.forEach(m=>{
-        const grp = arr.filter(d=>d.period);
-        dt.row.add([
-          'Client A', m,
-          grp.reduce((s,d)=>s+d.spend,0).toLocaleString(),
-          grp.reduce((s,d)=>s+d.impr,0).toLocaleString(),
-          grp.reduce((s,d)=>s+d.clicks,0).toLocaleString(),
-          grp.reduce((s,d)=>s+d.conv,0).toLocaleString(),
-          grp.reduce((s,d)=>s+d.revenue,0).toLocaleString(),
-          (grp.reduce((s,d)=>s+d.roas,0)/grp.length).toFixed(1),
-          (grp.reduce((s,d)=>s+d.cpm,0)/grp.length).toFixed(1),
-          (grp.reduce((s,d)=>s+d.cpc,0)/grp.length).toFixed(1),
-          (grp.reduce((s,d)=>s+d.ctr,0)/grp.length).toFixed(2),
-          (grp.reduce((s,d)=>s+d.cpa,0)/grp.length).toFixed(1),
-          (grp.reduce((s,d)=>s+d.cvr,0)/grp.length).toFixed(2)
-        ]);
+      // Summary Table
+      const sum = arr.reduce((acc,d)=>{
+        acc.spend   += d.spend;
+        acc.impr    += d.impr;
+        acc.clicks  += d.clicks;
+        acc.conv    += d.conv;
+        acc.revenue += d.revenue;
+        acc.roas    += d.roas;
+        acc.cpm     += d.cpm;
+        acc.cpc     += d.cpc;
+        acc.ctr     += d.ctr;
+        acc.cpa     += d.cpa;
+        acc.cvr     += d.cvr;
+        return acc;
+      },{spend:0,impr:0,clicks:0,conv:0,revenue:0,roas:0,cpm:0,cpc:0,ctr:0,cpa:0,cvr:0});
+      const avgRoas = (sum.roas/arr.length).toFixed(1);
+      const avgCpm  = (sum.cpm/arr.length).toFixed(1);
+      const avgCpc  = (sum.cpc/arr.length).toFixed(1);
+      const avgCtr  = (sum.ctr/arr.length).toFixed(2);
+      const avgCpa  = (sum.cpa/arr.length).toFixed(1);
+      const avgCvr  = (sum.cvr/arr.length).toFixed(2);
+      const tbody = `<tr>
+        <td class="dt-center">Client A</td>
+        <td class="dt-center">${sec==='overall'?'전체':sec.replace('GFA',' GFA')}</td>
+        <td class="dt-right">${sum.spend.toLocaleString()}</td>
+        <td class="dt-right">${sum.impr.toLocaleString()}</td>
+        <td class="dt-right">${sum.clicks.toLocaleString()}</td>
+        <td class="dt-right">${sum.conv.toLocaleString()}</td>
+        <td class="dt-right">${sum.revenue.toLocaleString()}</td>
+        <td class="dt-right">${avgRoas}</td>
+        <td class="dt-right">${avgCpm}</td>
+        <td class="dt-right">${avgCpc}</td>
+        <td class="dt-right">${avgCtr}</td>
+        <td class="dt-right">${avgCpa}</td>
+        <td class="dt-right">${avgCvr}</td>
+      </tr>`;
+      const summaryTable = $(`#${sec}SummaryTable`).DataTable({ destroy:true });
+      summaryTable.clear();
+      summaryTable.rows.add([['Client A', sec==='overall'?'전체':sec.replace('GFA',' GFA'),
+        sum.spend,sum.impr,sum.clicks,sum.conv,sum.revenue,avgRoas,avgCpm,avgCpc,avgCtr,avgCpa,avgCvr
+      ]]).draw();
+      // Ensure columns aligned
+      summaryTable.columns().every(function(idx){
+        $(this.header()).css('text-align', idx<2?'center':'right');
       });
-      dt.draw();
-
-      // Raw Data Table with all metrics
-      const tbody = document.querySelector(`#${sec}PeriodTable tbody`);
-      const thead = document.getElementById(`${sec}PeriodHeader`);
-      thead.innerHTML = `
+      // Period Table
+      const ptbody = document.querySelector(`#${sec}PeriodTable tbody`);
+      const pthead = document.getElementById(`${sec}PeriodHeader`);
+      pthead.innerHTML = `
         <th class="dt-center">기간</th>
         <th class="dt-right">광고비용</th>
         <th class="dt-right">노출수</th>
@@ -196,7 +210,7 @@
         <th class="dt-right">CPA</th>
         <th class="dt-right">CVR(%)</th>
       `;
-      tbody.innerHTML = arr.map(d=>`
+      ptbody.innerHTML = arr.map(d=>`
         <tr>
           <td class="dt-center">${d.period}</td>
           <td class="dt-right">${d.spend.toLocaleString()}</td>
@@ -214,28 +228,19 @@
       `).join('');
     }
 
-    $(document).ready(()=>{
-      // DataTables 초기화
-      sections.forEach(sec=>{
-        $(`#${sec}MediaTable`).DataTable({
+    $(document).ready(function(){
+      // Summary tables init
+      sections.forEach(sec => {
+        $(`#${sec}SummaryTable`).DataTable({
           columns: [
-            { title:'Client',  className:'dt-center' },
-            { title:'Media',   className:'dt-center' },
-            { title:'Spend',   className:'dt-right' },
-            { title:'Impr.',   className:'dt-right' },
-            { title:'Clicks',  className:'dt-right' },
-            { title:'Conv.',   className:'dt-right' },
-            { title:'Revenue', className:'dt-right' },
-            { title:'ROAS',    className:'dt-right' },
-            { title:'CPM',     className:'dt-right' },
-            { title:'CPC',     className:'dt-right' },
-            { title:'CTR',     className:'dt-right' },
-            { title:'CPA',     className:'dt-right' },
-            { title:'CVR',     className:'dt-right' }
+            { title:'Client'  },{ title:'Media'   },{ title:'광고비용' },
+            { title:'노출수' },{ title:'클릭수' },{ title:'구매수' },
+            { title:'매출액' },{ title:'ROAS(%)'},{ title:'CPM'     },
+            { title:'CPC'     },{ title:'CTR(%)' },{ title:'CPA'     },
+            { title:'CVR(%)' }
           ],
-          ordering:false, paging:false, info:false, searching:false
+          ordering:false,paging:false,info:false,searching:false
         });
-        // 토글 버튼 이벤트
         $(`#${sec}ShortBtn, #${sec}LongBtn`).click(function(){
           termMode[sec] = this.id.endsWith('ShortBtn')?'short':'long';
           $(`#${sec}Toggle button`).removeClass('active');
