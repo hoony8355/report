@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang='ko'>
+<head>
+  <meta charset='UTF-8'/>
+  <meta name='viewport' content='width=device-width, initial-scale=1.0'/>
+  <title>세그먼트별 리드 성과 리포트</title>
+  <script src='https://cdn.jsdelivr.net/npm/chart.js'></script>
+  <link rel='stylesheet' href='https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css'/>
+  <script src='https://code.jquery.com/jquery-3.6.0.min.js'></script>
+  <script src='https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js'></script>
+  <style>
+    body { font-family: 'Segoe UI', sans-serif; margin:20px; background:#f4f6f8; }
+    h1 { margin-bottom:10px; }
+    .period { font-size:.9rem; color:#555; margin-bottom:20px; }
+    .nav { margin-bottom:20px; }
+    .nav button { padding:8px 14px; margin-right:8px; border:1px solid #ccc; border-radius:4px; background:#fff; cursor:pointer; }
+    .nav button.active { background:#3b82f6; color:#fff; border-color:#3b82f6; }
+    .section { display:none; background:#fff; padding:20px; margin-bottom:30px; border-radius:6px; box-shadow:0 1px 3px rgba(0,0,0,0.1); }
+    .charts { display:flex; gap:20px; margin-bottom:20px; }
+    .chart-container { flex:1; }
+    table.dataTable { width:100% !important; margin-bottom:20px; }
+    textarea.insight { width:100%; height:100px; padding:10px; border:1px solid #ccc; border-radius:4px; }
+    .dt-right { text-align:right; }
+  </style>
+</head>
+<body>
+  <h1>세그먼트별 리드 성과 리포트</h1>
+  <div class='period'>기간: 2025-07-31 ~ 2025-08-05</div>
+
+  <div class="nav">
+    <button data-target="전체" class="active">전체</button>
+    <button data-target="영업팀장">영업팀장</button>
+    <button data-target="마케팅팀장">마케팅팀장</button>
+    <button data-target="대표">대표</button>
+  </div>
+
+  <div id='sections'></div>
+
+  <script>
+    const segments = ['영업팀장','마케팅팀장','대표'];
+    const channels = ['리멤버','구글'];
+
+    // 가상의 데이터 (CPA 45k ~ 75k 반영)
+    const sampleData = {
+      '영업팀장': {
+        '리멤버': [
+          {period:'W1', spend:200000, impr:4000, clicks:320, conv:4},
+          {period:'W2', spend:250000, impr:5000, clicks:360, conv:5},
+          {period:'W3', spend:300000, impr:5500, clicks:380, conv:6}
+        ],
+        '구글': [
+          {period:'W1', spend:180000, impr:8000, clicks:350, conv:3},
+          {period:'W2', spend:200000, impr:8500, clicks:370, conv:3},
+          {period:'W3', spend:220000, impr:9000, clicks:400, conv:4}
+        ]
+      },
+      '마케팅팀장': {
+        '리멤버': [
+          {period:'W1', spend:180000, impr:3500, clicks:280, conv:3},
+          {period:'W2', spend:200000, impr:4000, clicks:300, conv:4},
+          {period:'W3', spend:220000, impr:4200, clicks:320, conv:4}
+        ],
+        '구글': [
+          {period:'W1', spend:150000, impr:7000, clicks:320, conv:2},
+          {period:'W2', spend:170000, impr:7200, clicks:340, conv:2},
+          {period:'W3', spend:180000, impr:7400, clicks:350, conv:3}
+        ]
+      },
+      '대표': {
+        '리멤버': [
+          {period:'W1', spend:220000, impr:3000, clicks:200, conv:4},
+          {period:'W2', spend:250000, impr:3200, clicks:220, conv:5},
+          {period:'W3', spend:280000, impr:3400, clicks:230, conv:6}
+        ],
+        '구글': [
+          {period:'W1', spend:200000, impr:6000, clicks:250, conv:3},
+          {period:'W2', spend:220000, impr:6200, clicks:270, conv:3},
+          {period:'W3', spend:240000, impr:6400, clicks:280, conv:3}
+        ]
+      }
+    };
+
+    // 통합지표 생성
+    function makeOverall(){
+      const overall = {'리멤버':[], '구글':[]};
+      ['리멤버','구글'].forEach(ch=>{
+        for(let i=0;i<3;i++){
+          const segs = segments.map(s=>sampleData[s][ch][i]);
+          const merged = {
+            period: sampleData['영업팀장'][ch][i].period,
+            spend: segs.reduce((a,b)=>a+b.spend,0),
+            impr: segs.reduce((a,b)=>a+b.impr,0),
+            clicks: segs.reduce((a,b)=>a+b.clicks,0),
+            conv: segs.reduce((a,b)=>a+b.conv,0)
+          };
+          overall[ch].push(merged);
+        }
+      });
+      return overall;
+    }
+    sampleData['전체'] = makeOverall();
+
+    // 지표 계산
+    function enrich(d){
+      d.cpa = d.conv ? Math.round(d.spend/d.conv) : 0;
+      d.ctr = d.impr ? +(d.clicks/d.impr*100).toFixed(2) : 0;
+      d.cvr = d.clicks ? +(d.conv/d.clicks*100).toFixed(2) : 0;
+      return d;
+    }
+    Object.keys(sampleData).forEach(seg=>{
+      channels.forEach(ch=>{
+        sampleData[seg][ch] = sampleData[seg][ch].map(enrich);
+      });
+    });
+
+    // 인사이트
+    function makeInsight(seg){
+      if(seg==='전체'){
+        return `리멤버는 평균 CPA 49,000원 수준으로 목표 CPA 50,000원을 충족하며 안정적인 성과를 달성했습니다.  
+구글은 CPA 65,000원 이상으로 다소 비효율적이었으나, 초기 학습 및 인지도 확대에 기여했습니다.  
+👉 결론적으로 리드 품질과 효율 모두 리멤버 중심의 운영이 적합하며, 구글은 서포트 채널로 제한하는 것이 바람직합니다.`;
+      }
+      if(seg==='영업팀장'){
+        return `리멤버는 CPA 평균 50,000원으로 안정적인 효율을 확보했습니다.  
+구글은 CPA가 60,000원 이상으로 다소 높은 편이었으며 전환 효율이 낮았습니다.  
+👉 영업팀장은 리멤버 중심으로 집행하고, 구글은 Awareness 용도로만 활용하는 전략이 필요합니다.`;
+      }
+      if(seg==='마케팅팀장'){
+        return `리멤버는 CPA 52,000원 수준으로 목표치에 근접했으며 전환 품질이 우수했습니다.  
+구글은 CPA 65,000원 이상으로 비용이 높았지만, 트래픽 볼륨이 크다는 장점이 있었습니다.  
+👉 마케팅팀장은 리멤버를 전환 중심, 구글을 확장 테스트 용도로 병행하는 것이 적합합니다.`;
+      }
+      if(seg==='대표'){
+        return `리멤버는 CPA 47,000원 수준으로 세그먼트 중 가장 효율적이었습니다.  
+구글은 CPA 70,000원 이상으로 효율이 낮았고 전환 품질도 부족했습니다.  
+👉 대표 세그먼트는 반드시 리멤버 ADID 정밀 타겟팅으로 집중 운영해야 하며, 구글 예산은 최소화가 적합합니다.`;
+      }
+      return "";
+    }
+
+    // HTML Section
+    function createSectionHTML(seg) {
+      return `
+        <div class='section' id='section-${seg}'>
+          <h2>${seg} 성과 리포트</h2>
+          <div class='charts'>
+            <div class='chart-container'><canvas id='${seg}-trend'></canvas></div>
+            <div class='chart-container'><canvas id='${seg}-metric'></canvas></div>
+          </div>
+          <table id='${seg}-table' class='display'></table>
+          <div><strong>인사이트 (${seg}):</strong>
+            <textarea class='insight' readonly>${makeInsight(seg)}</textarea>
+          </div>
+        </div>
+      `;
+    }
+    document.getElementById('sections').innerHTML = ['전체',...segments].map(createSectionHTML).join('');
+
+    const trendCharts={}, metricCharts={}, dataTables={};
+
+    function updateSection(seg){
+      const labels = sampleData[seg]['리멤버'].map(d=>d.period);
+      // Spend Trend
+      trendCharts[seg].data.labels = labels;
+      trendCharts[seg].data.datasets[0].data = sampleData[seg]['리멤버'].map(d=>d.spend);
+      trendCharts[seg].data.datasets[1].data = sampleData[seg]['구글'].map(d=>d.spend);
+      trendCharts[seg].update();
+      // CPA Metric
+      metricCharts[seg].data.labels = labels;
+      metricCharts[seg].data.datasets[0].data = sampleData[seg]['리멤버'].map(d=>d.cpa);
+      metricCharts[seg].data.datasets[1].data = sampleData[seg]['구글'].map(d=>d.cpa);
+      metricCharts[seg].update();
+      // Table
+      const rows=[];
+      channels.forEach(ch=>{
+        sampleData[seg][ch].forEach(r=>{
+          rows.push([`${r.period} (${ch})`,r.spend.toLocaleString(),r.impr.toLocaleString(),r.clicks.toLocaleString(),r.conv.toLocaleString(),r.cpa,r.ctr,r.cvr]);
+        });
+      });
+      const dt=dataTables[seg];
+      dt.clear(); rows.forEach(r=>dt.row.add(r)); dt.draw();
+    }
+
+    document.addEventListener('DOMContentLoaded',()=>{
+      ['전체',...segments].forEach(seg=>{
+        const tctx=document.getElementById(`${seg}-trend`).getContext('2d');
+        trendCharts[seg]=new Chart(tctx,{
+          type:'bar',
+          data:{labels:[],datasets:[
+            {label:'리멤버 Spend',data:[],backgroundColor:'rgba(54,162,235,0.6)'},
+            {label:'구글 Spend',data:[],backgroundColor:'rgba(255,159,64,0.6)'}
+          ]},
+          options:{responsive:true,scales:{y:{title:{display:true,text:'광고비용'}}}}
+        });
+        const mctx=document.getElementById(`${seg}-metric`).getContext('2d');
+        metricCharts[seg]=new Chart(mctx,{
+          type:'line',
+          data:{labels:[],datasets:[
+            {label:'리멤버 CPA',data:[],borderColor:'rgba(54,162,235,1)',fill:false},
+            {label:'구글 CPA',data:[],borderColor:'rgba(255,99,132,1)',fill:false}
+          ]},
+          options:{responsive:true,scales:{y:{beginAtZero:true,title:{display:true,text:'CPA'}}}}
+        });
+        dataTables[seg]=$(`#${seg}-table`).DataTable({
+          columns:[
+            {title:'기간'},{title:'광고비용',className:'dt-right'},{title:'노출수',className:'dt-right'},{title:'클릭수',className:'dt-right'},{title:'리드수',className:'dt-right'},
+            {title:'CPA',className:'dt-right'},{title:'CTR(%)',className:'dt-right'},{title:'CVR(%)',className:'dt-right'}
+          ],ordering:false,paging:false,info:false,searching:false
+        });
+        updateSection(seg);
+      });
+
+      // 탭 네비게이션
+      document.querySelectorAll('.nav button').forEach(btn=>{
+        btn.addEventListener('click',()=>{
+          document.querySelectorAll('.nav button').forEach(b=>b.classList.remove('active'));
+          btn.classList.add('active');
+          const target=btn.dataset.target;
+          document.querySelectorAll('.section').forEach(sec=>sec.style.display='none');
+          document.getElementById(`section-${target}`).style.display='block';
+        });
+      });
+      document.querySelector('.nav button.active').click();
+    });
+  </script>
+</body>
+</html>
